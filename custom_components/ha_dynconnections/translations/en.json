@@ -1,0 +1,67 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "HA DynConnections",
+        "description": "Choose the device whose location determines your departure stop, and search for your destination stop by name.",
+        "data": {
+          "device_tracker": "Location device",
+          "destination_query": "Destination stop (search)"
+        }
+      },
+      "destination": {
+        "title": "Choose destination stop",
+        "description": "Pick the correct stop from the search results.",
+        "data": {
+          "destination_id": "Destination stop"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to transport.rest.",
+      "no_stops_found": "No matching stops found for that search term."
+    },
+    "abort": {
+      "already_configured": "This device/destination combination is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HA DynConnections settings",
+        "description": "Current destination: {current_destination}. Optionally search for a new destination, and adjust how many nearby stops are suggested.",
+        "data": {
+          "destination_query": "Change destination (search, optional)",
+          "nearby_results": "Number of suggested nearby stops",
+          "nearby_distance": "Search radius for nearby stops (meters)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to transport.rest.",
+      "no_stops_found": "No matching stops found for that search term."
+    }
+  },
+  "entity": {
+    "select": {
+      "origin_stop": {
+        "name": "Departure stop"
+      }
+    },
+    "datetime": {
+      "departure_at": {
+        "name": "Desired departure time"
+      }
+    },
+    "button": {
+      "search": {
+        "name": "Search connections"
+      }
+    },
+    "sensor": {
+      "next_connections": {
+        "name": "Next connections"
+      }
+    }
+  }
+}

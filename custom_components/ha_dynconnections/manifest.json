@@ -1,0 +1,13 @@
+{
+  "domain": "ha_dynconnections",
+  "name": "HA DynConnections",
+  "codeowners": ["@charly166"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http"],
+  "documentation": "https://github.com/charly166/ha-dynconnections",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/charly166/ha-dynconnections/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
