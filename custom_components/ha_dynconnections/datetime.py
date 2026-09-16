@@ -1,7 +1,7 @@
 """DateTime-Entität für die optionale Wunsch-Abfahrtszeit.
 
 Bleibt der Wert leer, sucht der Coordinator ab "jetzt" (Standardverhalten der
-transport.rest `/journeys`-API ohne `departure`-Parameter).
+EFA `XSLT_TRIP_REQUEST2`-Schnittstelle ohne `itdDate`/`itdTime`-Parameter).
 """
 from __future__ import annotations
 

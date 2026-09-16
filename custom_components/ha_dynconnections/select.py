@@ -18,7 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .api import TransportRestClient, TransportRestError
+from .api import VvsEfaClient, VvsEfaError
 from .const import CONF_DEVICE_TRACKER, CONF_NEARBY_DISTANCE, CONF_NEARBY_RESULTS, DOMAIN
 from .coordinator import DynConnectionsCoordinator
 
@@ -43,7 +43,7 @@ class DynConnectionsOriginSelect(RestoreEntity, SelectEntity):
     def __init__(
         self,
         hass: HomeAssistant,
-        client: TransportRestClient,
+        client: VvsEfaClient,
         coordinator: DynConnectionsCoordinator,
         entry: ConfigEntry,
     ) -> None:
@@ -96,7 +96,7 @@ class DynConnectionsOriginSelect(RestoreEntity, SelectEntity):
                 results=self._entry.options.get(CONF_NEARBY_RESULTS, 5),
                 distance=self._entry.options.get(CONF_NEARBY_DISTANCE, 1000),
             )
-        except TransportRestError as err:
+        except VvsEfaError as err:
             _LOGGER.warning("Konnte nahegelegene Haltestellen nicht laden: %s", err)
             return
 

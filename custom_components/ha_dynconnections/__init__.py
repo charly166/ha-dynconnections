@@ -1,4 +1,4 @@
-"""HA DynConnections – dynamische ÖPNV-Verbindungsauskunft (transport.rest)."""
+"""HA DynConnections – dynamische ÖPNV-Verbindungsauskunft (VVS-EFA-Backend)."""
 from __future__ import annotations
 
 import logging
@@ -8,7 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import TransportRestClient
+from .api import VvsEfaClient
 from .const import (
     CARD_FILENAME,
     CARD_VERSION,
@@ -29,7 +29,7 @@ CARD_URL_PATH = f"{STATIC_BASE_PATH}/{CARD_FILENAME}?v={CARD_VERSION}"
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     session = async_get_clientsession(hass)
-    client = TransportRestClient(session)
+    client = VvsEfaClient(session)
 
     coordinator = DynConnectionsCoordinator(
         hass,

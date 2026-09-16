@@ -18,7 +18,7 @@
       }
     },
     "error": {
-      "cannot_connect": "Could not connect to transport.rest.",
+      "cannot_connect": "Could not connect to efa.vvs.de.",
       "no_stops_found": "No matching stops found for that search term."
     },
     "abort": {
@@ -38,7 +38,7 @@
       }
     },
     "error": {
-      "cannot_connect": "Could not connect to transport.rest.",
+      "cannot_connect": "Could not connect to efa.vvs.de.",
       "no_stops_found": "No matching stops found for that search term."
     }
   },

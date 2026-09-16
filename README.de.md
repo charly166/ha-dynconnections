@@ -22,8 +22,9 @@ und die eigentliche Suche nach den nächsten 5 Verbindungen wird per
 Button-Druck ausgelöst – kein Hintergrund-Polling.
 
 Gebaut mit der **Region Stuttgart (VVS)** als erstem Zielgebiet, als
-Datenquelle dient die kostenlose [transport.rest](https://v6.db.transport.rest)
-API (HAFAS-Daten der Deutschen Bahn).
+Datenquelle dient dasselbe EFA-Backend (Elektronische Fahrplanauskunft), das
+auch [efa.vvs.de](https://efa.vvs.de), die offizielle VVS-Fahrplanauskunft,
+selbst nutzt.
 
 ## Funktionen
 
@@ -44,23 +45,36 @@ API (HAFAS-Daten der Deutschen Bahn).
   Timetable rendert
 - Mehrere konfigurierte Strecken möglich (z.B. "nach Hause" und "zur
   Arbeit") – jede ist eine eigene Config Entry mit eigenen Entitäten
-- Kein Account/API-Key nötig – transport.rest ist kostenlos und ohne
+- Kein Account/API-Key nötig – die EFA-Schnittstelle ist kostenlos und ohne
   Authentifizierung nutzbar
 
-**Bekannte Einschränkung:** transport.rest basiert auf dem HAFAS
-`db`-Profil der Deutschen Bahn, das laut eigener Doku "Fernverkehr,
-Regionalverkehr und einige lokale Buslinien" abdeckt (vergleichbar mit der
-DB-Navigator-App). Rein lokale VVS-Stadtbahn- oder Buslinien sind darüber
-möglicherweise nicht immer vollständig abgedeckt. Sollte sich das für deine
-Strecken als echte Lücke herausstellen, ist der Austausch von `api.py`s
-`TransportRestClient` gegen einen VVS-eigenen EFA-Client der vorgesehene
-Erweiterungspunkt – hier bewusst nicht gebaut, um den Einstiegs-Scope fokussiert
-zu halten.
+## Datenquelle
+
+Diese Integration fragt `efa.vvs.de/vvs` direkt an – dasselbe Backend, das
+auch die öffentliche Fahrplanauskunft-Website [efa.vvs.de](https://efa.vvs.de)
+selbst für Haltestellensuche, Umkreissuche und Verbindungssuche verwendet. Da
+es sich um das VVS-eigene, regionale System handelt (kein bundesweiter
+Fernverkehrs-Aggregator), sind lokale Stadtbahn-, Straßenbahn- und Buslinien
+darüber korrekt abgedeckt.
+
+**Wichtiger Hinweis:** Dies ist die interne Schnittstelle der öffentlichen
+Website, keine offiziell dokumentierte/lizenzierte Drittanbieter-API (eine
+frühere Version dieser Integration nutzte [transport.rest](https://v6.db.transport.rest),
+einen Wrapper um die HAFAS-API der Deutschen Bahn – diese zugrunde liegende
+HAFAS-API wurde von der DB abgeschaltet, wodurch die Verbindungssuche
+komplett ausfiel, weshalb diese Integration auf eine direkte VVS-Anfrage
+umgestellt wurde). Die Schnittstelle kann sich jederzeit ohne Ankündigung
+ändern oder eingeschränkt/blockiert werden. Anfragen erfolgen nur bei
+Standortänderung und Button-Druck (nie per Timer), um die Last auf den
+VVS-Servern gering zu halten. Sollte sich diese Schnittstelle als
+unzuverlässig erweisen, wäre die offiziell lizenzierte Alternative die
+[EFA-JSON-API / TRIAS-API von MobiData BW](https://mobidata-bw.de/dataset/trias)
+(deckt ganz Baden-Württemberg ab, erfordert eine Registrierung).
 
 ## Datenschutz-Hinweis
 
 Die GPS-Koordinaten des konfigurierten Geräts werden nur transient an
-transport.rest übertragen, um nahegelegene Haltestellen zu ermitteln – es
+`efa.vvs.de` übertragen, um nahegelegene Haltestellen zu ermitteln – es
 wird nichts darüber hinaus gespeichert, was Home Assistants eigene
 `device_tracker`-Historie nicht ohnehin schon vorhält.
 
@@ -161,7 +175,7 @@ automation:
   enthalten) – keine zusätzlichen pip-Pakete werden installiert
 - Die Lovelace-Karte ist eine reine Vanilla-Web-Component ohne Build-Schritt
   und lädt keine externen Web-Fonts (nur Systemschriften)
-- `iot_class: cloud_polling` – Anfragen an transport.rest erfolgen nur bei
+- `iot_class: cloud_polling` – Anfragen an `efa.vvs.de` erfolgen nur bei
   Standortänderung des Geräts (Haltestellen-Vorschläge) und bei Button-Druck
   (Verbindungssuche); es gibt kein periodisches Hintergrund-Polling für
   Verbindungen
@@ -180,7 +194,10 @@ ha-dynconnections/
 ├── docs/logo.png           Vollständiges Logo für README/Repo
 └── custom_components/ha_dynconnections/
     ├── __init__.py          Setup, statische Dateiauslieferung
-    ├── api.py                Schlanker transport.rest-Client
+    ├── api.py                Schlanker Client für das VVS-EFA-Backend
+    ├── brand/                 Lokale Icons für "Geräte & Dienste" (HA 2026.3+)
+    │   ├── icon.png / icon@2x.png
+    │   └── logo.png / logo@2x.png
     ├── button.py              Such-Auslöser-Entität
     ├── config_flow.py        Einrichtungsdialog (Standort-Gerät + Zielsuche) + Options-Flow
     ├── const.py

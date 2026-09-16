@@ -22,8 +22,9 @@ search for the next 5 connections is triggered by a button press – no
 background polling.
 
 Built with the **Region Stuttgart (VVS)** as the initial target area, using
-the free [transport.rest](https://v6.db.transport.rest) API (Deutsche Bahn
-HAFAS data) as its data source.
+the same EFA (Elektronische Fahrplanauskunft) backend that powers
+[efa.vvs.de](https://efa.vvs.de), the VVS's own public journey planner, as
+its data source.
 
 ## Features
 
@@ -43,19 +44,31 @@ HAFAS data) as its data source.
   plus a bundled Lovelace card that renders it as a proper timetable
 - Multiple configured routes supported (e.g. "home" and "work") – each is a
   separate config entry with its own set of entities
-- No account/API key needed – transport.rest is free and unauthenticated
+- No account/API key needed – the EFA endpoint is free and unauthenticated
 
-**Known limitation:** transport.rest is built on Deutsche Bahn's HAFAS `db`
-profile, which officially covers "long-distance and regional traffic, plus
-some local buses" (comparable to the DB Navigator app). Purely local VVS
-tram/Stadtbahn or bus lines may not always be fully covered. If this turns
-out to be a real gap for your routes, swapping `api.py`'s `TransportRestClient`
-for a VVS-specific EFA client is the intended extension point – not built
-here to keep the initial scope focused.
+## Data source
+
+This integration queries `efa.vvs.de/vvs` directly – the same backend the
+public [efa.vvs.de](https://efa.vvs.de) journey planner website itself uses
+for stop search, nearby-stop lookup, and trip planning. Since it's VVS's own
+regional system (not a nationwide long-distance aggregator), it covers local
+Stadtbahn, tram, and bus lines properly.
+
+**Caveat:** this is the internal endpoint of the public website, not an
+officially documented/licensed third-party API (an earlier version of this
+integration used [transport.rest](https://v6.db.transport.rest), a wrapper
+around Deutsche Bahn's HAFAS API – that underlying HAFAS API was shut off by
+DB, breaking journey search entirely, which is why this integration switched
+to querying VVS directly). It could change or be rate-limited/blocked without
+notice. Requests only happen on device-location change and button press
+(never on a timer), to keep load on VVS's servers minimal. If this endpoint
+ever becomes unreliable, the officially licensed alternative is the
+[EFA-JSON-API / TRIAS-API from MobiData BW](https://mobidata-bw.de/dataset/trias)
+(covers all of Baden-Württemberg, requires registering for access).
 
 ## Privacy note
 
-The configured device's GPS coordinates are sent to transport.rest only
+The configured device's GPS coordinates are sent to `efa.vvs.de` only
 transiently, to look up nearby stops – nothing is stored beyond what Home
 Assistant's own `device_tracker` history already retains.
 
@@ -152,7 +165,7 @@ automation:
   Assistant) – no extra pip packages are installed
 - The Lovelace card is a plain Vanilla Web Component, no build step, and
   loads no external web fonts (system fonts only)
-- `iot_class: cloud_polling` – requests to transport.rest only happen on
+- `iot_class: cloud_polling` – requests to `efa.vvs.de` only happen on
   device-location change (nearby-stop lookup) and on button press (journey
   search); there is no periodic background polling for connections
 - Coordinator uses `update_interval=None` – it never refreshes on its own,
@@ -170,7 +183,10 @@ ha-dynconnections/
 ├── docs/logo.png           Full logo for README/repo
 └── custom_components/ha_dynconnections/
     ├── __init__.py          Setup, static file serving
-    ├── api.py                Slim transport.rest client
+    ├── api.py                Slim client for VVS's EFA backend
+    ├── brand/                 Local icons for "Devices & Services" (HA 2026.3+)
+    │   ├── icon.png / icon@2x.png
+    │   └── logo.png / logo@2x.png
     ├── button.py              Search-trigger entity
     ├── config_flow.py        Setup dialog (location device + destination search) + options flow
     ├── const.py

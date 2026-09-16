@@ -16,7 +16,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import TransportRestClient, TransportRestError, summarize_journey
+from .api import VvsEfaClient, VvsEfaError, summarize_journey
 from .const import DOMAIN, JOURNEY_RESULTS
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class DynConnectionsCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
     def __init__(
         self,
         hass: HomeAssistant,
-        client: TransportRestClient,
+        client: VvsEfaClient,
         destination_id: str,
         destination_name: str,
     ) -> None:
@@ -51,7 +51,7 @@ class DynConnectionsCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                 departure=self.departure_at,
                 results=JOURNEY_RESULTS,
             )
-        except TransportRestError as err:
+        except VvsEfaError as err:
             raise UpdateFailed(str(err)) from err
 
         return [summarize_journey(journey) for journey in journeys]

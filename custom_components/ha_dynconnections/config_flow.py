@@ -1,6 +1,6 @@
 """Config-Flow: wählt das Standort-Device (device_tracker) und die Zielhaltestelle.
 
-Die Zielhaltestelle wird per Namenssuche gegen transport.rest ermittelt, da
+Die Zielhaltestelle wird per Namenssuche gegen die VVS-EFA-Schnittstelle ermittelt, da
 die API keine Autocomplete-Combobox im Config-Flow-Formular selbst erlaubt -
 stattdessen zeigt ein zweiter Schritt die gefundenen Treffer als Auswahlliste.
 
@@ -19,7 +19,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import TransportRestClient, TransportRestError
+from .api import VvsEfaClient, VvsEfaError
 from .const import (
     CONF_DESTINATION_ID,
     CONF_DESTINATION_NAME,
@@ -45,7 +45,7 @@ STEP_USER_SCHEMA = vol.Schema(
 
 async def _search_destinations(hass: HomeAssistant, query: str) -> dict[str, str]:
     session = async_get_clientsession(hass)
-    client = TransportRestClient(session)
+    client = VvsEfaClient(session)
     results = await client.search_locations(query)
     return {str(stop["id"]): stop.get("name", str(stop["id"])) for stop in results if stop.get("id")}
 
@@ -68,7 +68,7 @@ class DynConnectionsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._destination_candidates = await _search_destinations(
                     self.hass, user_input["destination_query"]
                 )
-            except TransportRestError:
+            except VvsEfaError:
                 errors["base"] = "cannot_connect"
             else:
                 if not self._destination_candidates:
@@ -141,7 +141,7 @@ class DynConnectionsOptionsFlow(config_entries.OptionsFlow):
             if destination_query:
                 try:
                     candidates = await _search_destinations(self.hass, destination_query)
-                except TransportRestError:
+                except VvsEfaError:
                     errors["base"] = "cannot_connect"
                 else:
                     if not candidates:

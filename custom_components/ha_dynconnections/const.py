@@ -13,7 +13,11 @@ DEFAULT_NEARBY_DISTANCE = 1000  # Meter
 
 JOURNEY_RESULTS = 5
 
-TRANSPORT_REST_BASE_URL = "https://v6.db.transport.rest"
+# VVS' eigener EFA-Server (dieselbe Schnittstelle, die auch efa.vvs.de/vvs
+# als öffentliche Fahrplanauskunft-Website selbst nutzt). Bewusst statt
+# v6.db.transport.rest gewählt, nachdem die zugrunde liegende DB-HAFAS-API
+# dort abgeschaltet wurde (siehe README, Abschnitt "Datenquelle").
+EFA_BASE_URL = "https://efa.vvs.de/vvs"
 
 PLATFORMS = ["sensor", "select", "datetime", "button"]
 

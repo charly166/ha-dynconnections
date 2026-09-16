@@ -18,7 +18,7 @@
       }
     },
     "error": {
-      "cannot_connect": "Verbindung zu transport.rest fehlgeschlagen.",
+      "cannot_connect": "Verbindung zu efa.vvs.de fehlgeschlagen.",
       "no_stops_found": "Zu diesem Suchbegriff wurden keine passenden Haltestellen gefunden."
     },
     "abort": {
@@ -38,7 +38,7 @@
       }
     },
     "error": {
-      "cannot_connect": "Verbindung zu transport.rest fehlgeschlagen.",
+      "cannot_connect": "Verbindung zu efa.vvs.de fehlgeschlagen.",
       "no_stops_found": "Zu diesem Suchbegriff wurden keine passenden Haltestellen gefunden."
     }
   },
