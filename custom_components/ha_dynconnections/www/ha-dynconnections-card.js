@@ -37,7 +37,11 @@ function formatTime(iso) {
 
 class HaDynConnectionsCard extends HTMLElement {
   setConfig(config) {
-    this._config = config || {};
+    const next = config || {};
+    if (this._config && JSON.stringify(this._config) === JSON.stringify(next)) {
+      return;
+    }
+    this._config = next;
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
     }
@@ -49,11 +53,23 @@ class HaDynConnectionsCard extends HTMLElement {
   }
 
   set hass(hass) {
-    const firstRun = !this._hass;
+    // Bewusst NUR beim allerersten Zuweisen neu rendern: Home Assistant
+    // ruft diesen Setter sehr häufig auf (bei praktisch jeder
+    // Zustandsänderung irgendwo im System), nicht nur bei tatsächlich für
+    // diese Karte relevanten Änderungen. Ein Re-Render bei jedem Aufruf
+    // würde das komplette Shadow-DOM neu aufbauen und dabei z.B. ein
+    // gerade geöffnetes Zeit-Auswahlfeld schließen/den Fokus verlieren.
+    // Alle für die Anzeige relevanten Daten (Haltestellen, Ergebnisse)
+    // liegen ohnehin in explizitem State, der nur durch Nutzeraktionen
+    // (Button-Klicks) aktualisiert wird - ein reaktives Re-Render bei
+    // jedem hass-Update ist dafür nicht nötig.
+    const first = !this._hass;
     this._hass = hass;
-    this._render();
-    if (firstRun && this._config?.device_tracker) {
-      this._refreshNearbyStops();
+    if (first) {
+      this._render();
+      if (this._config?.device_tracker) {
+        this._refreshNearbyStops();
+      }
     }
   }
 
@@ -246,13 +262,30 @@ class HaDynConnectionsCard extends HTMLElement {
 // natives <select> ist dafür genauso zuverlässig wie der Rest der Karte.
 class HaDynConnectionsCardEditor extends HTMLElement {
   setConfig(config) {
-    this._config = config || {};
+    // Der Dashboard-Editor ruft setConfig() ggf. erneut auf, nachdem er ein
+    // von uns gefeuertes config-changed-Event verarbeitet hat. Ist der Inhalt
+    // identisch, ist das ein reines Echo - kein Re-Render, sonst würde eine
+    // gerade laufende Eingabe (z.B. im Zielhaltestellen-Suchfeld) den Fokus
+    // verlieren, obwohl sich inhaltlich nichts geändert hat.
+    const next = config || {};
+    if (this._config && JSON.stringify(this._config) === JSON.stringify(next)) {
+      return;
+    }
+    this._config = next;
     this._render();
   }
 
   set hass(hass) {
+    // Wie bei der Haupt-Karte: nur beim ersten Zuweisen rendern, siehe
+    // ausführliche Begründung dort. Ohne diese Guard würde jedes
+    // hass-Update (sehr häufig, unabhängig von Nutzeraktionen) das
+    // Formular neu aufbauen und dabei den Fokus aus einem gerade
+    // getippten Eingabefeld (z.B. der Zielhaltestellen-Suche) werfen.
+    const first = !this._hass;
     this._hass = hass;
-    this._render();
+    if (first) {
+      this._render();
+    }
   }
 
   _emitConfigChanged() {
@@ -349,6 +382,7 @@ class HaDynConnectionsCardEditor extends HTMLElement {
     this.shadowRoot.getElementById("device_tracker").addEventListener("change", (ev) => {
       this._config = { ...this._config, device_tracker: ev.target.value };
       this._emitConfigChanged();
+      this._render();
     });
 
     this.shadowRoot.getElementById("destination_search").addEventListener("click", () => {

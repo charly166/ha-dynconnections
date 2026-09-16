@@ -133,7 +133,7 @@ Ressource (Storage-Modus-Dashboards). Nutzt dein Dashboard den alten
 YAML-Modus, füge das manuell in `ui-lovelace.yaml` ein:
 ```yaml
 resources:
-  - url: /ha_dynconnections/ha-dynconnections-card.js?v=2
+  - url: /ha_dynconnections/ha-dynconnections-card.js?v=3
     type: module
 ```
 
