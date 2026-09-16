@@ -2,12 +2,6 @@
 
 DOMAIN = "ha_dynconnections"
 
-CONF_DEVICE_TRACKER = "device_tracker"
-CONF_DESTINATION_ID = "destination_id"
-CONF_DESTINATION_NAME = "destination_name"
-CONF_NEARBY_RESULTS = "nearby_results"
-CONF_NEARBY_DISTANCE = "nearby_distance"
-
 DEFAULT_NEARBY_RESULTS = 5
 DEFAULT_NEARBY_DISTANCE = 1000  # Meter
 
@@ -19,10 +13,12 @@ JOURNEY_RESULTS = 5
 # dort abgeschaltet wurde (siehe README, Abschnitt "Datenquelle").
 EFA_BASE_URL = "https://efa.vvs.de/vvs"
 
-PLATFORMS = ["sensor", "select", "datetime", "button"]
+# Keine Entity-Plattformen: alle Bedienung läuft über die Karte, die per
+# WebSocket-Befehle (websocket_api.py) mit der Integration spricht.
+PLATFORMS: list[str] = []
 
 CARD_FILENAME = "ha-dynconnections-card.js"
 STATIC_BASE_PATH = f"/{DOMAIN}"
 
 # Wird bei jeder inhaltlichen Änderung der Karte hochgezählt, siehe frontend.py.
-CARD_VERSION = "1"
+CARD_VERSION = "2"

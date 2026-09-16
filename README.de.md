@@ -17,9 +17,9 @@
 Eine Home-Assistant-Custom-Integration mit eigener Lovelace-Karte für eine
 dynamische ÖPNV-Verbindungsauskunft: die Abfahrtshaltestelle wird anhand des
 Live-Standorts eines Smartphones vorgeschlagen (über die Home Assistant
-Companion App), die Zielhaltestelle ist in den Einstellungen fest hinterlegt,
-und die eigentliche Suche nach den nächsten 5 Verbindungen wird per
-Button-Druck ausgelöst – kein Hintergrund-Polling.
+Companion App), Zielhaltestelle und Standort-Gerät werden direkt im Editor
+der Karte selbst gewählt, und die eigentliche Suche nach den nächsten 5
+Verbindungen wird per Button-Druck ausgelöst – kein Hintergrund-Polling.
 
 Gebaut mit der **Region Stuttgart (VVS)** als erstem Zielgebiet, als
 Datenquelle dient dasselbe EFA-Backend (Elektronische Fahrplanauskunft), das
@@ -28,25 +28,28 @@ selbst nutzt.
 
 ## Funktionen
 
+- **Alles wird in der Karte selbst konfiguriert** – kein Einstellungsdialog
+  pro Strecke: Karte hinzufügen, Standort-Gerät wählen und Zielhaltestelle
+  suchen, direkt im visuellen Editor der Karte
+- **Mehrere Strecken** – einfach eine weitere Karte mit anderer
+  Geräte-/Ziel-Kombination hinzufügen (z.B. "nach Hause" und "zur Arbeit"),
+  keine zusätzlichen Einrichtungsschritte nötig
 - **Vorschläge für die Abfahrtshaltestelle** basierend auf dem Live-Standort
-  eines beliebigen `device_tracker` (z.B. dein Handy über die Companion App)
-  – als Dropdown (`select`-Entität), aktualisiert sich automatisch bei
-  Standortänderung
-- **Feste Zielhaltestelle**, einmalig bei der Einrichtung per Namenssuche
-  festgelegt, später änderbar über Einstellungen → Geräte & Dienste → HA
-  DynConnections → Konfigurieren
-- **Optionale Wunsch-Abfahrtszeit** (`datetime`-Entität) – leer lassen für
-  eine Suche ab "jetzt"
-- **Such-Button** (`button`-Entität) – Verbindungen werden nur abgefragt,
-  wenn du es willst, nicht per Timer
-- **Die nächsten 5 Verbindungen** als Sensor mit `connections`-Attribut
-  (Linie, Richtung, Abfahrt inkl. Verspätung, Gleis, Ankunft, Umstiege,
-  Dauer), dazu eine mitgelieferte Lovelace-Karte, die daraus eine echte
-  Timetable rendert
-- Mehrere konfigurierte Strecken möglich (z.B. "nach Hause" und "zur
-  Arbeit") – jede ist eine eigene Config Entry mit eigenen Entitäten
+  des konfigurierten `device_tracker` (z.B. dein Handy über die Companion
+  App), als Dropdown mit manuellem Aktualisieren-Button
+- **Optionale Wunsch-Abfahrtszeit** – leer lassen für eine Suche ab "jetzt"
+- **Such-Button** – Verbindungen werden nur abgefragt, wenn du es willst,
+  nicht per Timer
+- **Die nächsten 5 Verbindungen** werden direkt in der Karte als Timetable
+  angezeigt (Linie, Richtung, Abfahrt inkl. Verspätung, Gleis, Ankunft,
+  Umstiege, Dauer)
 - Kein Account/API-Key nötig – die EFA-Schnittstelle ist kostenlos und ohne
   Authentifizierung nutzbar
+
+**Hinweis:** Da Strecken komplett in der Karten-Konfiguration leben (nicht
+in Home-Assistant-Entitäten), gibt es aktuell keinen Sensor/Button zum
+Andocken von Automationen – die Bedienung läuft ausschließlich über den
+Such-Button in der Karte.
 
 ## Datenquelle
 
@@ -99,89 +102,66 @@ wird nichts darüber hinaus gespeichert, was Home Assistants eigene
    ```
 2. Home Assistant neu starten
 
-## 1. Integration einrichten
+## 1. Integration aktivieren
 
 **Einstellungen → Geräte & Dienste → Integration hinzufügen** → nach "HA
-DynConnections" suchen:
+DynConnections" suchen → bestätigen. Es gibt keine Felder auszufüllen –
+dieser Schritt aktiviert nur das Backend (und die Karte) für deine
+Home-Assistant-Instanz.
 
-1. **Standort-Gerät** wählen – jede `device_tracker`-Entität mit
-   GPS-Koordinaten, typischerweise dein Handy über die Companion App
-   (`device_tracker.<dein_handy>`)
-2. **Zielhaltestelle** per Namenssuche finden, dann die passende aus den
-   Ergebnissen auswählen
+## 2. Karte hinzufügen und Strecke konfigurieren
 
-## 2. Karte zum Dashboard hinzufügen
-
-1. Dashboard bearbeiten → **Karte hinzufügen** → ganz nach unten scrollen →
-   **Manuell**
-2. Einfügen (Entity-IDs an die für deine Config Entry erzeugten anpassen –
-   zu finden unter Einstellungen → Geräte & Dienste → HA DynConnections →
-   Geräteseite):
-   ```yaml
-   type: custom:ha-dynconnections-card
-   title: Nach Hause
-   origin_entity: select.nach_hause_abfahrtshaltestelle
-   datetime_entity: datetime.nach_hause_gewunschte_abfahrtszeit
-   button_entity: button.nach_hause_verbindung_suchen
-   sensor_entity: sensor.nach_hause_nachste_verbindungen
-   ```
-3. Speichern. Die Karte zeigt ein Dropdown für die Abfahrtshaltestelle, eine
+1. Dashboard bearbeiten → **Karte hinzufügen** → nach **"HA DynConnections"**
+   suchen (oder ganz nach unten scrollen zu "Manuell" und
+   `type: custom:ha-dynconnections-card` verwenden)
+2. Im sich öffnenden Karten-Editor:
+   - **Standort-Gerät** wählen (jeder `device_tracker` mit GPS-Koordinaten,
+     typischerweise dein Handy über die Companion App)
+   - **Zielhaltestelle suchen** per Name und die passende aus den
+     Ergebnissen auswählen
+   - Optional einen **Titel** setzen (Standard: "Nach `<Ziel>`")
+3. Speichern. Die Karte zeigt ein Dropdown für die Abfahrtshaltestelle
+   (automatisch befüllt aus dem aktuellen Standort deines Geräts), eine
    optionale Zeitwahl, einen Such-Button und darunter die Timetable.
+
+Eine zweite Strecke (z.B. zur Arbeit statt nach Hause)? Einfach eine weitere
+Karte hinzufügen und mit anderem Gerät/Ziel konfigurieren – ohne nochmal in
+die Einstellungen zu müssen.
 
 Die Karte registriert sich beim Setup automatisch als Lovelace-Dashboard-
 Ressource (Storage-Modus-Dashboards). Nutzt dein Dashboard den alten
 YAML-Modus, füge das manuell in `ui-lovelace.yaml` ein:
 ```yaml
 resources:
-  - url: /ha_dynconnections/ha-dynconnections-card.js?v=1
+  - url: /ha_dynconnections/ha-dynconnections-card.js?v=2
     type: module
 ```
 
-**Auch ohne die Karte** funktionieren alle vier Entitäten (`select`,
-`datetime`, `button`, `sensor`) einzeln und können in eine normale
-Entities-Karte gelegt werden – nur die Timetable als Tabelle bekommst du
-ohne diese Karte (oder eine separate Community-Karte, z.B. eine
-Markdown-Karte mit Jinja-Template über das `connections`-Attribut, oder
-eine "flex-table-card") nicht angezeigt.
-
 ## 3. Nutzung
 
-1. Das Dropdown für die **Abfahrtshaltestelle** aktualisiert sich automatisch
-   bei Standortänderung deines Handys; bei mehreren nahegelegenen
-   Haltestellen die passende auswählen
+1. Das Dropdown für die **Abfahrtshaltestelle** wird beim ersten Laden der
+   Karte aus dem aktuellen Standort deines Geräts befüllt; über den
+   ⟳-Button daneben nach einer Standortänderung aktualisieren
 2. Optional eine **Wunsch-Abfahrtszeit** setzen
-3. **Suchen** drücken – der Sensor aktualisiert sich mit den nächsten 5
-   Verbindungen
-
-## Automatisierungs-Beispiel
-
-```yaml
-automation:
-  - alias: "Verbindung beim Verlassen einer Zone aktualisieren"
-    trigger:
-      - platform: zone
-        entity_id: device_tracker.dein_handy
-        zone: zone.home
-        event: leave
-    action:
-      - service: button.press
-        target:
-          entity_id: button.nach_hause_verbindung_suchen
-```
+3. **Suchen** drücken – die Karte zeigt die nächsten 5 Verbindungen
 
 ## Technische Hinweise
 
 - Reine Python-Standardbibliothek + `aiohttp` (in Home Assistant bereits
   enthalten) – keine zusätzlichen pip-Pakete werden installiert
-- Die Lovelace-Karte ist eine reine Vanilla-Web-Component ohne Build-Schritt
-  und lädt keine externen Web-Fonts (nur Systemschriften)
+- Die Lovelace-Karte (inkl. ihres visuellen Editors) ist eine reine
+  Vanilla-Web-Component ohne Build-Schritt und lädt keine externen
+  Web-Fonts (nur Systemschriften); sie spricht ausschließlich über
+  WebSocket-Befehle mit der Integration
+  (`ha_dynconnections/search_stops`, `ha_dynconnections/nearby_stops`,
+  `ha_dynconnections/search_journeys` - siehe `websocket_api.py`)
 - `iot_class: cloud_polling` – Anfragen an `efa.vvs.de` erfolgen nur bei
   Standortänderung des Geräts (Haltestellen-Vorschläge) und bei Button-Druck
   (Verbindungssuche); es gibt kein periodisches Hintergrund-Polling für
   Verbindungen
-- Der Coordinator nutzt `update_interval=None` – er aktualisiert sich nie von
-  selbst, nur über den Such-Button (oder dessen `button.press`-Service, z.B.
-  aus einer Automation)
+- Streckenkonfiguration (Standort-Gerät, Zielhaltestelle) und Suchstatus
+  leben komplett in der Karten-Konfiguration/-Laufzeit, nicht in
+  Home-Assistant-Entitäten – siehe Trade-off unter "Funktionen"
 
 ## Ordnerstruktur
 
@@ -198,25 +178,19 @@ ha-dynconnections/
     ├── brand/                 Lokale Icons für "Geräte & Dienste" (HA 2026.3+)
     │   ├── icon.png / icon@2x.png
     │   └── logo.png / logo@2x.png
-    ├── button.py              Such-Auslöser-Entität
-    ├── config_flow.py        Einrichtungsdialog (Standort-Gerät + Zielsuche) + Options-Flow
+    ├── config_flow.py        Einziger, feldloser Bestätigungsschritt
     ├── const.py
-    ├── coordinator.py        Nur-manuell-Refresh-Coordinator (Verbindungssuche)
-    ├── datetime.py            Wunsch-Abfahrtszeit-Entität
     ├── frontend.py            Automatische Lovelace-Ressourcen-Registrierung
     ├── manifest.json
-    ├── select.py              Abfahrtshaltestellen-Dropdown (aktualisiert sich per Standort)
-    ├── sensor.py              Ergebnis-Entität für die nächsten 5 Verbindungen
     ├── strings.json / translations/
+    ├── websocket_api.py       Backend für die Karte (Haltestellensuche, Umkreissuche, Verbindungssuche)
     └── www/
-        └── ha-dynconnections-card.js    Lovelace-Karte (GUI)
+        └── ha-dynconnections-card.js    Lovelace-Karte + ihr visueller Editor (GUI)
 ```
 
 ## Mindestanforderungen
 
-- Home Assistant **2024.12.0** oder neuer (der Options-Flow nutzt die
-  `config_entry`-Property, die Home Assistant Core Config-Flows seit dieser
-  Version automatisch bereitstellt)
+- Home Assistant **2024.12.0** oder neuer
 
 ## Lizenz
 

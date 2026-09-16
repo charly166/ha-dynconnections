@@ -3,115 +3,203 @@
 // Bewusst kein externes Web-Font geladen (System-Fonts reichen), um keine
 // unnötigen Drittanbieter-Requests von Besuchern auszulösen.
 //
-// Erwartete Card-Konfiguration (YAML):
+// Die gesamte Konfiguration (Standort-Gerät, Zielhaltestelle) passiert im
+// visuellen Karten-Editor (HaDynConnectionsCardEditor weiter unten) - nicht
+// mehr über feste Entity-IDs. Card-Konfiguration:
 //   type: custom:ha-dynconnections-card
-//   origin_entity: select.xxx_abfahrtshaltestelle
-//   datetime_entity: datetime.xxx_gewuenschte_abfahrtszeit
-//   button_entity: button.xxx_verbindung_suchen
-//   sensor_entity: sensor.xxx_naechste_verbindungen
+//   device_tracker: device_tracker.xxx
+//   destination_id: "5006075"
+//   destination_name: "Charlottenplatz"
 //   title: "Nach Hause"   # optional
+//
+// Laufzeitstatus (gewählte Abfahrtshaltestelle, letzte Suchergebnisse) lebt
+// bewusst nur im Arbeitsspeicher der Karte, nicht persistiert - bleibt beim
+// Neuladen des Dashboards einfach zurückgesetzt.
+
+const DOMAIN = "ha_dynconnections";
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[c]));
+}
+
+function formatTime(iso) {
+  if (!iso) return "-";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
 
 class HaDynConnectionsCard extends HTMLElement {
   setConfig(config) {
-    for (const key of ["origin_entity", "datetime_entity", "button_entity", "sensor_entity"]) {
-      if (!config[key]) {
-        throw new Error(`ha-dynconnections-card: "${key}" muss in der Card-Konfiguration gesetzt sein.`);
-      }
-    }
-    this._config = config;
+    this._config = config || {};
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
     }
+    this._originStops = this._originStops || [];
+    this._selectedOriginId = this._selectedOriginId || null;
+    this._connections = this._connections || [];
+    this._departureValue = this._departureValue || "";
     this._render();
   }
 
   set hass(hass) {
+    const firstRun = !this._hass;
     this._hass = hass;
     this._render();
+    if (firstRun && this._config?.device_tracker) {
+      this._refreshNearbyStops();
+    }
+  }
+
+  static getConfigElement() {
+    return document.createElement("ha-dynconnections-card-editor");
+  }
+
+  static getStubConfig() {
+    return {};
   }
 
   getCardSize() {
     return 5;
   }
 
+  async _refreshNearbyStops() {
+    const trackerState = this._hass.states[this._config.device_tracker];
+    const lat = trackerState?.attributes?.latitude;
+    const lon = trackerState?.attributes?.longitude;
+    if (lat == null || lon == null) {
+      this._stopsError = "Das gewählte Gerät liefert aktuell keinen Standort.";
+      this._render();
+      return;
+    }
+    this._stopsError = null;
+    this._loadingStops = true;
+    this._render();
+    try {
+      const result = await this._hass.connection.sendMessagePromise({
+        type: `${DOMAIN}/nearby_stops`,
+        latitude: lat,
+        longitude: lon,
+      });
+      this._originStops = result.stops || [];
+      if (!this._originStops.some((s) => s.id === this._selectedOriginId)) {
+        this._selectedOriginId = this._originStops[0]?.id || null;
+      }
+    } catch (err) {
+      this._stopsError = err.message || "Haltestellen konnten nicht geladen werden.";
+    } finally {
+      this._loadingStops = false;
+      this._render();
+    }
+  }
+
+  async _search() {
+    if (!this._selectedOriginId || !this._config.destination_id) {
+      return;
+    }
+    this._searching = true;
+    this._searchError = null;
+    this._render();
+    try {
+      const departure = this._departureValue ? new Date(this._departureValue).toISOString() : undefined;
+      const result = await this._hass.connection.sendMessagePromise({
+        type: `${DOMAIN}/search_journeys`,
+        origin_id: this._selectedOriginId,
+        destination_id: this._config.destination_id,
+        ...(departure ? { departure } : {}),
+      });
+      this._connections = result.connections || [];
+    } catch (err) {
+      this._searchError = err.message || "Verbindungssuche fehlgeschlagen.";
+    } finally {
+      this._searching = false;
+      this._render();
+    }
+  }
+
   _render() {
-    if (!this._config || !this._hass) {
-      return;
-    }
-    const originState = this._hass.states[this._config.origin_entity];
-    const datetimeState = this._hass.states[this._config.datetime_entity];
-    const sensorState = this._hass.states[this._config.sensor_entity];
-
-    if (!originState || !datetimeState || !sensorState) {
-      this.shadowRoot.innerHTML = `<ha-card><div class="card-content">Entität(en) nicht gefunden. Bitte Card-Konfiguration prüfen.</div></ha-card>`;
+    if (!this._hass || !this._config) {
       return;
     }
 
-    const title = this._config.title || "HA DynConnections";
-    const options = originState.attributes.options || [];
-    const connections = (sensorState.attributes.connections || []);
+    if (!this._config.device_tracker || !this._config.destination_id) {
+      this.shadowRoot.innerHTML = `
+        <style>${HaDynConnectionsCard._styles()}</style>
+        <ha-card>
+          <div class="card-content">
+            <p class="empty">Bitte im Karten-Editor ein Standort-Gerät und eine Zielhaltestelle wählen (Dashboard bearbeiten → Karte bearbeiten).</p>
+          </div>
+        </ha-card>
+      `;
+      return;
+    }
+
+    const title = this._config.title || `Nach ${this._config.destination_name || "?"}`;
 
     this.shadowRoot.innerHTML = `
       <style>${HaDynConnectionsCard._styles()}</style>
       <ha-card>
-        <div class="header">${this._escape(title)}</div>
+        <div class="header">${escapeHtml(title)}</div>
         <div class="card-content">
+          ${this._stopsError ? `<p class="error">${escapeHtml(this._stopsError)}</p>` : ""}
           <div class="controls">
             <label>
               Von
-              <select id="origin">
-                ${options
-                  .map(
-                    (opt) =>
-                      `<option value="${this._escape(opt)}" ${opt === originState.state ? "selected" : ""}>${this._escape(opt)}</option>`
-                  )
-                  .join("")}
-              </select>
+              <span class="row">
+                <select id="origin" ${this._loadingStops ? "disabled" : ""}>
+                  ${this._originStops
+                    .map(
+                      (stop) =>
+                        `<option value="${escapeHtml(stop.id)}" ${stop.id === this._selectedOriginId ? "selected" : ""}>${escapeHtml(stop.name)}</option>`
+                    )
+                    .join("")}
+                </select>
+                <button id="refresh" title="Haltestellen neu laden" ${this._loadingStops ? "disabled" : ""}>⟳</button>
+              </span>
             </label>
             <label>
               Abfahrt
-              <input id="departure" type="datetime-local" value="${this._toLocalInputValue(datetimeState.state)}" />
+              <input id="departure" type="datetime-local" value="${escapeHtml(this._departureValue)}" />
             </label>
-            <button id="search">Verbindung suchen</button>
+            <button id="search" ${this._searching || !this._selectedOriginId ? "disabled" : ""}>
+              ${this._searching ? "Suche läuft…" : "Verbindung suchen"}
+            </button>
           </div>
-          ${this._renderTable(connections)}
+          ${this._searchError ? `<p class="error">${escapeHtml(this._searchError)}</p>` : ""}
+          ${this._renderTable()}
         </div>
       </ha-card>
     `;
 
     this.shadowRoot.getElementById("origin").addEventListener("change", (ev) => {
-      this._hass.callService("select", "select_option", {
-        entity_id: this._config.origin_entity,
-        option: ev.target.value,
-      });
+      this._selectedOriginId = ev.target.value;
     });
-
+    this.shadowRoot.getElementById("refresh").addEventListener("click", () => this._refreshNearbyStops());
     this.shadowRoot.getElementById("departure").addEventListener("change", (ev) => {
-      const value = ev.target.value ? new Date(ev.target.value).toISOString() : null;
-      this._hass.callService("datetime", "set_value", {
-        entity_id: this._config.datetime_entity,
-        datetime: value,
-      });
+      this._departureValue = ev.target.value;
     });
-
-    this.shadowRoot.getElementById("search").addEventListener("click", () => {
-      this._hass.callService("button", "press", { entity_id: this._config.button_entity });
-    });
+    this.shadowRoot.getElementById("search").addEventListener("click", () => this._search());
   }
 
-  _renderTable(connections) {
-    if (!connections.length) {
+  _renderTable() {
+    if (!this._connections.length) {
       return `<p class="empty">Noch keine Suche gestartet oder keine Verbindungen gefunden.</p>`;
     }
-    const rows = connections
+    const rows = this._connections
       .map(
         (c) => `
         <tr>
-          <td>${this._escape(c.line || "-")}</td>
-          <td>${this._escape(c.direction || "-")}</td>
-          <td>${this._formatTime(c.departure)}${c.delay_minutes ? ` <span class="delay">+${c.delay_minutes}</span>` : ""}</td>
-          <td>${this._escape(c.platform || "-")}</td>
-          <td>${this._formatTime(c.arrival)}</td>
+          <td>${escapeHtml(c.line || "-")}</td>
+          <td>${escapeHtml(c.direction || "-")}</td>
+          <td>${formatTime(c.departure)}${c.delay_minutes ? ` <span class="delay">+${c.delay_minutes}</span>` : ""}</td>
+          <td>${escapeHtml(c.platform || "-")}</td>
+          <td>${formatTime(c.arrival)}</td>
           <td>${c.transfers ?? "-"}</td>
           <td>${c.duration_minutes != null ? `${c.duration_minutes} min` : "-"}</td>
         </tr>`
@@ -130,49 +218,171 @@ class HaDynConnectionsCard extends HTMLElement {
     `;
   }
 
-  _formatTime(iso) {
-    if (!iso) return "-";
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return "-";
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-
-  _toLocalInputValue(iso) {
-    if (!iso || iso === "unknown" || iso === "unavailable") return "";
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return "";
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  }
-
-  _escape(value) {
-    return String(value).replace(/[&<>"']/g, (c) => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;",
-    }[c]));
-  }
-
   static _styles() {
     return `
       .header { font-size: 1.2em; font-weight: 500; padding: 16px 16px 0; color: var(--primary-text-color); }
       .card-content { padding: 16px; font-family: var(--paper-font-body1_-_font-family, inherit); }
       .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 16px; }
       label { display: flex; flex-direction: column; font-size: 0.85em; color: var(--secondary-text-color); gap: 4px; }
+      .row { display: flex; gap: 4px; }
       select, input, button { font: inherit; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); }
       button { cursor: pointer; background: var(--primary-color); color: var(--text-primary-color, #fff); border: none; padding: 8px 14px; }
+      button:disabled { opacity: 0.6; cursor: default; }
+      #refresh { padding: 6px 10px; }
       table { width: 100%; border-collapse: collapse; }
       th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--divider-color); font-size: 0.9em; }
       th { color: var(--secondary-text-color); font-weight: 500; }
       .delay { color: var(--error-color, #db4437); font-weight: 600; }
       .empty { color: var(--secondary-text-color); font-style: italic; }
+      .error { color: var(--error-color, #db4437); }
+    `;
+  }
+}
+
+// Visueller Karten-Editor: Standort-Gerät und Zielhaltestelle werden hier
+// gewählt, nicht mehr per YAML/Entity-ID. Bewusst kein <ha-entity-picker>
+// verwendet - das ist ein undokumentiertes, internes HA-Frontend-Element
+// ohne Garantie, dass es beim Laden der Karte bereits registriert ist. Ein
+// natives <select> ist dafür genauso zuverlässig wie der Rest der Karte.
+class HaDynConnectionsCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = config || {};
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  _emitConfigChanged() {
+    this.dispatchEvent(
+      new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true })
+    );
+  }
+
+  async _searchDestination(query) {
+    if (!query) return;
+    this._destinationError = null;
+    this._destinationResults = null;
+    this._render();
+    try {
+      const result = await this._hass.connection.sendMessagePromise({
+        type: `${DOMAIN}/search_stops`,
+        query,
+      });
+      this._destinationResults = result.stops || [];
+    } catch (err) {
+      this._destinationError = err.message || "Suche fehlgeschlagen.";
+    }
+    this._render();
+  }
+
+  _render() {
+    if (!this.shadowRoot) {
+      this.attachShadow({ mode: "open" });
+    }
+    if (!this._hass || !this._config) {
+      return;
+    }
+
+    const trackers = Object.values(this._hass.states)
+      .filter((s) => s.entity_id.startsWith("device_tracker."))
+      .sort((a, b) => (a.attributes.friendly_name || a.entity_id).localeCompare(b.attributes.friendly_name || b.entity_id));
+
+    this.shadowRoot.innerHTML = `
+      <style>${HaDynConnectionsCardEditor._styles()}</style>
+      <div class="form">
+        <label>
+          Titel (optional)
+          <input id="title" type="text" value="${escapeHtml(this._config.title || "")}" placeholder="Nach ${escapeHtml(this._config.destination_name || "...")}" />
+        </label>
+
+        <label>
+          Standort-Gerät
+          <select id="device_tracker">
+            <option value="">– wählen –</option>
+            ${trackers
+              .map(
+                (t) =>
+                  `<option value="${escapeHtml(t.entity_id)}" ${t.entity_id === this._config.device_tracker ? "selected" : ""}>${escapeHtml(t.attributes.friendly_name || t.entity_id)}</option>`
+              )
+              .join("")}
+          </select>
+        </label>
+
+        <label>
+          Zielhaltestelle
+          <span class="row">
+            <input id="destination_query" type="text" placeholder="Haltestelle suchen…" />
+            <button id="destination_search">Suchen</button>
+          </span>
+        </label>
+
+        ${
+          this._config.destination_name
+            ? `<p class="current">Aktuelles Ziel: <strong>${escapeHtml(this._config.destination_name)}</strong></p>`
+            : ""
+        }
+        ${this._destinationError ? `<p class="error">${escapeHtml(this._destinationError)}</p>` : ""}
+        ${
+          this._destinationResults
+            ? `<ul class="results">
+                ${this._destinationResults
+                  .map(
+                    (stop) =>
+                      `<li data-id="${escapeHtml(stop.id)}" data-name="${escapeHtml(stop.name)}">${escapeHtml(stop.name)}</li>`
+                  )
+                  .join("")}
+                ${this._destinationResults.length === 0 ? "<li><em>Keine Treffer</em></li>" : ""}
+              </ul>`
+            : ""
+        }
+      </div>
+    `;
+
+    this.shadowRoot.getElementById("title").addEventListener("change", (ev) => {
+      this._config = { ...this._config, title: ev.target.value };
+      this._emitConfigChanged();
+    });
+
+    this.shadowRoot.getElementById("device_tracker").addEventListener("change", (ev) => {
+      this._config = { ...this._config, device_tracker: ev.target.value };
+      this._emitConfigChanged();
+    });
+
+    this.shadowRoot.getElementById("destination_search").addEventListener("click", () => {
+      this._searchDestination(this.shadowRoot.getElementById("destination_query").value.trim());
+    });
+
+    this.shadowRoot.querySelectorAll(".results li[data-id]").forEach((li) => {
+      li.addEventListener("click", () => {
+        this._config = { ...this._config, destination_id: li.dataset.id, destination_name: li.dataset.name };
+        this._destinationResults = null;
+        this._emitConfigChanged();
+        this._render();
+      });
+    });
+  }
+
+  static _styles() {
+    return `
+      .form { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
+      label { display: flex; flex-direction: column; font-size: 0.85em; color: var(--secondary-text-color, #666); gap: 4px; }
+      .row { display: flex; gap: 8px; }
+      input, select, button { font: inherit; padding: 8px; border-radius: 6px; border: 1px solid var(--divider-color, #ccc); background: var(--card-background-color, #fff); color: var(--primary-text-color, #000); }
+      button { cursor: pointer; }
+      .current { margin: 0; font-size: 0.9em; }
+      .error { color: var(--error-color, #db4437); margin: 0; }
+      .results { list-style: none; margin: 0; padding: 0; border: 1px solid var(--divider-color, #ccc); border-radius: 6px; max-height: 200px; overflow-y: auto; }
+      .results li { padding: 8px; cursor: pointer; }
+      .results li:hover { background: var(--secondary-background-color, #f0f0f0); }
     `;
   }
 }
 
 customElements.define("ha-dynconnections-card", HaDynConnectionsCard);
+customElements.define("ha-dynconnections-card-editor", HaDynConnectionsCardEditor);
 
 window.customCards = window.customCards || [];
 window.customCards.push({

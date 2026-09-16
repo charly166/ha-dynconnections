@@ -3,65 +3,11 @@
     "step": {
       "user": {
         "title": "HA DynConnections",
-        "description": "Wähle das Gerät, dessen Standort die Abfahrtshaltestelle bestimmt, und suche deine Zielhaltestelle per Name.",
-        "data": {
-          "device_tracker": "Standort-Gerät",
-          "destination_query": "Zielhaltestelle (Suche)"
-        }
-      },
-      "destination": {
-        "title": "Zielhaltestelle wählen",
-        "description": "Wähle die passende Haltestelle aus den Suchergebnissen.",
-        "data": {
-          "destination_id": "Zielhaltestelle"
-        }
+        "description": "HA DynConnections aktivieren. Standort-Gerät und Zielhaltestelle werden pro Karte im eigenen Editor der Karte konfiguriert, wenn du sie zu einem Dashboard hinzufügst."
       }
-    },
-    "error": {
-      "cannot_connect": "Verbindung zu efa.vvs.de fehlgeschlagen.",
-      "no_stops_found": "Zu diesem Suchbegriff wurden keine passenden Haltestellen gefunden."
     },
     "abort": {
-      "already_configured": "Diese Kombination aus Gerät und Zielhaltestelle ist bereits eingerichtet."
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "HA DynConnections Einstellungen",
-        "description": "Aktuelles Ziel: {current_destination}. Optional ein neues Ziel suchen und die Anzahl vorgeschlagener nahegelegener Haltestellen anpassen.",
-        "data": {
-          "destination_query": "Ziel ändern (Suche, optional)",
-          "nearby_results": "Anzahl vorgeschlagener Haltestellen",
-          "nearby_distance": "Suchradius für Haltestellen (Meter)"
-        }
-      }
-    },
-    "error": {
-      "cannot_connect": "Verbindung zu efa.vvs.de fehlgeschlagen.",
-      "no_stops_found": "Zu diesem Suchbegriff wurden keine passenden Haltestellen gefunden."
-    }
-  },
-  "entity": {
-    "select": {
-      "origin_stop": {
-        "name": "Abfahrtshaltestelle"
-      }
-    },
-    "datetime": {
-      "departure_at": {
-        "name": "Gewünschte Abfahrtszeit"
-      }
-    },
-    "button": {
-      "search": {
-        "name": "Verbindung suchen"
-      }
-    },
-    "sensor": {
-      "next_connections": {
-        "name": "Nächste Verbindungen"
-      }
+      "already_configured": "HA DynConnections ist bereits eingerichtet."
     }
   }
 }

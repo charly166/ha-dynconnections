@@ -17,9 +17,9 @@
 A Home Assistant custom integration with its own Lovelace card for dynamic
 public-transport connection lookups: your departure stop is suggested based
 on a smartphone's live location (via the Home Assistant Companion App), your
-destination stop is fixed in the integration's settings, and the actual
-search for the next 5 connections is triggered by a button press – no
-background polling.
+destination stop and location device are picked directly in the card's own
+editor, and the actual search for the next 5 connections is triggered by a
+button press – no background polling.
 
 Built with the **Region Stuttgart (VVS)** as the initial target area, using
 the same EFA (Elektronische Fahrplanauskunft) backend that powers
@@ -28,23 +28,26 @@ its data source.
 
 ## Features
 
-- **Departure stop suggestions** based on the live GPS location of any
-  `device_tracker` entity (e.g. your phone via the Companion App) – shown as
-  a dropdown (`select` entity), refreshed automatically whenever the device
-  moves
-- **Fixed destination stop**, chosen once during setup by searching its name,
-  changeable later via Settings → Devices & Services → HA DynConnections →
-  Configure
-- **Optional desired departure time** (`datetime` entity) – leave empty to
-  search from "now"
-- **Search button** (`button` entity) – connections are only looked up when
-  you actually want them, not on a timer
-- **Next 5 connections** as a sensor with a `connections` attribute (line,
-  direction, departure incl. delay, platform, arrival, transfers, duration),
-  plus a bundled Lovelace card that renders it as a proper timetable
-- Multiple configured routes supported (e.g. "home" and "work") – each is a
-  separate config entry with its own set of entities
+- **Everything configured in the card itself** – no Settings dialog per
+  route: add the card, pick a location device and search for a destination
+  stop right in the card's visual editor
+- **Multiple routes** – just add another card with a different device/
+  destination combination (e.g. "home" and "work"); no extra setup steps
+- **Departure stop suggestions** based on the live GPS location of the
+  configured `device_tracker` (e.g. your phone via the Companion App),
+  shown as a dropdown, with a manual refresh button
+- **Optional desired departure time** – leave empty to search from "now"
+- **Search button** – connections are only looked up when you actually want
+  them, not on a timer
+- **Next 5 connections** rendered directly in the card as a timetable
+  (line, direction, departure incl. delay, platform, arrival, transfers,
+  duration)
 - No account/API key needed – the EFA endpoint is free and unauthenticated
+
+**Note:** since routes live entirely in card configuration (not in Home
+Assistant entities), there's currently no sensor/button to hook into
+automations – everything is driven by pressing the search button in the
+card.
 
 ## Data source
 
@@ -92,85 +95,62 @@ Assistant's own `device_tracker` history already retains.
    ```
 2. Restart Home Assistant
 
-## 1. Set up the integration
+## 1. Enable the integration
 
 **Settings → Devices & Services → Add Integration** → search for "HA
-DynConnections":
+DynConnections" → confirm. There are no fields to fill in – this step just
+activates the backend (and the card) for your Home Assistant instance.
 
-1. Pick the **location device** – any `device_tracker` entity with GPS
-   coordinates, typically your phone via the Companion App
-   (`device_tracker.<your_phone>`)
-2. Search for your **destination stop** by name, then pick the correct one
-   from the results
+## 2. Add the card and configure your route
 
-## 2. Add the card to your dashboard
+1. Edit dashboard → **Add Card** → search for **"HA DynConnections"** (or
+   scroll to Manual and use `type: custom:ha-dynconnections-card`)
+2. In the card editor that opens:
+   - Pick your **location device** (any `device_tracker` with GPS
+     coordinates, typically your phone via the Companion App)
+   - **Search for your destination stop** by name and pick the correct one
+     from the results
+   - Optionally set a **title** (defaults to "Nach `<destination>`")
+3. Save. The card shows a departure-stop dropdown (auto-populated from your
+   device's current location), an optional time picker, a search button,
+   and the resulting timetable.
 
-1. Edit dashboard → **Add Card** → scroll to the bottom → **Manual**
-2. Paste (adjust the entity IDs to the ones created for your config entry –
-   find them under Settings → Devices & Services → HA DynConnections →
-   the device page):
-   ```yaml
-   type: custom:ha-dynconnections-card
-   title: Nach Hause
-   origin_entity: select.nach_hause_abfahrtshaltestelle
-   datetime_entity: datetime.nach_hause_gewunschte_abfahrtszeit
-   button_entity: button.nach_hause_verbindung_suchen
-   sensor_entity: sensor.nach_hause_nachste_verbindungen
-   ```
-3. Save. The card shows a departure-stop dropdown, an optional time picker,
-   a search button, and the resulting timetable.
+Want a second route (e.g. to work instead of home)? Just add another card
+and configure it with a different device/destination – no need to touch
+Settings again.
 
 The card registers itself as a Lovelace dashboard resource automatically on
 setup (storage-mode dashboards). If your dashboard uses legacy YAML mode,
 add this manually to `ui-lovelace.yaml`:
 ```yaml
 resources:
-  - url: /ha_dynconnections/ha-dynconnections-card.js?v=1
+  - url: /ha_dynconnections/ha-dynconnections-card.js?v=2
     type: module
 ```
 
-**Without the card**, all four entities (`select`, `datetime`, `button`,
-`sensor`) still work individually and can be placed in a normal Entities
-card – you just won't get the timetable rendered as a table without either
-this card or a separate community card (e.g. a Markdown card with a Jinja
-template iterating the sensor's `connections` attribute, or a
-"flex-table-card" pointed at that attribute).
-
 ## 3. Usage
 
-1. The **departure stop** dropdown updates automatically as your phone
-   moves; pick the correct one if several are nearby
+1. The **departure stop** dropdown is populated from your device's current
+   location when the card first loads; use the ⟳ button next to it to
+   refresh after moving
 2. Optionally set a **desired departure time**
-3. Press **search** – the sensor updates with the next 5 connections
-
-## Automation example
-
-```yaml
-automation:
-  - alias: "Refresh connections when leaving a zone"
-    trigger:
-      - platform: zone
-        entity_id: device_tracker.your_phone
-        zone: zone.home
-        event: leave
-    action:
-      - service: button.press
-        target:
-          entity_id: button.nach_hause_verbindung_suchen
-```
+3. Press **search** – the card shows the next 5 connections
 
 ## Technical Notes
 
 - Pure Python standard library + `aiohttp` (already bundled with Home
   Assistant) – no extra pip packages are installed
-- The Lovelace card is a plain Vanilla Web Component, no build step, and
-  loads no external web fonts (system fonts only)
+- The Lovelace card (including its visual editor) is a plain Vanilla Web
+  Component, no build step, and loads no external web fonts (system fonts
+  only); it talks to the integration exclusively via WebSocket commands
+  (`ha_dynconnections/search_stops`, `ha_dynconnections/nearby_stops`,
+  `ha_dynconnections/search_journeys`) - see `websocket_api.py`
 - `iot_class: cloud_polling` – requests to `efa.vvs.de` only happen on
   device-location change (nearby-stop lookup) and on button press (journey
   search); there is no periodic background polling for connections
-- Coordinator uses `update_interval=None` – it never refreshes on its own,
-  only via the search button (or its `button.press` service, e.g. from an
-  automation)
+- Route configuration (location device, destination stop) and search state
+  live entirely in the card's own config/runtime state, not in Home
+  Assistant entities – see "Features" above for the trade-off
 
 ## Folder structure
 
@@ -187,25 +167,19 @@ ha-dynconnections/
     ├── brand/                 Local icons for "Devices & Services" (HA 2026.3+)
     │   ├── icon.png / icon@2x.png
     │   └── logo.png / logo@2x.png
-    ├── button.py              Search-trigger entity
-    ├── config_flow.py        Setup dialog (location device + destination search) + options flow
+    ├── config_flow.py        Single, field-less confirmation step
     ├── const.py
-    ├── coordinator.py        Manual-refresh-only coordinator (journey search)
-    ├── datetime.py            Desired departure time entity
     ├── frontend.py            Automatic Lovelace resource registration
     ├── manifest.json
-    ├── select.py              Departure-stop dropdown (updates from device location)
-    ├── sensor.py              Next-5-connections result entity
     ├── strings.json / translations/
+    ├── websocket_api.py       Backend for the card (stop search, nearby stops, journeys)
     └── www/
-        └── ha-dynconnections-card.js    Lovelace card (GUI)
+        └── ha-dynconnections-card.js    Lovelace card + its visual editor (GUI)
 ```
 
 ## Minimum Requirements
 
-- Home Assistant **2024.12.0** or newer (the options flow relies on the
-  `config_entry` property Home Assistant core provides to config flows since
-  that release)
+- Home Assistant **2024.12.0** or newer
 
 ## License
 
