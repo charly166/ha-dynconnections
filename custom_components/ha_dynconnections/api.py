@@ -225,6 +225,13 @@ def _is_walking_leg(mode: dict[str, Any]) -> bool:
     return mode.get("product") == "Fussweg" or not (mode.get("name") or mode.get("number"))
 
 
+def _platform(point: dict[str, Any]) -> str | None:
+    # EFA nennt das Echtzeit-Gleis "platformName" (nicht "platform") -
+    # fällt auf das geplante Gleis zurück, falls (noch) keine Echtzeitdaten
+    # für diesen Punkt vorliegen.
+    return point.get("platformName") or point.get("plannedPlatformName")
+
+
 def _leg_summary(leg: dict[str, Any]) -> dict[str, Any]:
     """Fasst eine einzelne Etappe (Leg) für die Detail-Ansicht der Route zusammen."""
     mode = leg.get("mode") or {}
@@ -257,12 +264,15 @@ def _leg_summary(leg: dict[str, Any]) -> dict[str, Any]:
         "departure_stop": _fix_mojibake(departure_point.get("name")),
         "departure": real_departure,
         "planned_departure": planned_departure,
-        "departure_platform": departure_point.get("platform"),
+        "departure_platform": _platform(departure_point),
+        "planned_departure_platform": departure_point.get("plannedPlatformName"),
         "delay_minutes": _delay_minutes(planned_departure, real_departure),
         "arrival_stop": _fix_mojibake(arrival_point.get("name")),
         "arrival": real_arrival,
         "planned_arrival": planned_arrival,
-        "arrival_platform": arrival_point.get("platform"),
+        "arrival_platform": _platform(arrival_point),
+        "planned_arrival_platform": arrival_point.get("plannedPlatformName"),
+        "arrival_delay_minutes": _delay_minutes(planned_arrival, real_arrival),
     }
 
 
@@ -287,8 +297,10 @@ def summarize_journey(trip: dict[str, Any]) -> dict[str, Any]:
         "planned_departure": first_leg.get("planned_departure"),
         "delay_minutes": first_leg.get("delay_minutes", 0),
         "platform": first_leg.get("departure_platform"),
+        "planned_platform": first_leg.get("planned_departure_platform"),
         "arrival": last_leg.get("arrival"),
         "planned_arrival": last_leg.get("planned_arrival"),
+        "arrival_delay_minutes": last_leg.get("arrival_delay_minutes", 0),
         "duration_minutes": duration_minutes,
         "transfers": int(trip.get("interchange", 0) or 0),
         "lines": [leg["line"] for leg in transit_legs if leg.get("line")],

@@ -45,10 +45,13 @@ its data source.
   them, not on a timer
 - **Next 5 connections** rendered directly in the card as a timetable
   (line with the same colored mode badge as the stop picker, direction,
-  departure incl. delay, platform, arrival, transfers, duration)
+  departure/arrival with real-time delays, platform, transfers, duration)
+- **Platform changes highlighted**: if the real-time platform differs from
+  the originally planned one, it's shown underlined with the original as a
+  tooltip
 - **Full itinerary on demand**: connections with a transfer can be expanded
-  to show every leg (line, direction, stop, time, platform) plus any
-  walking connections between platforms
+  to show every leg (line, direction, stop, time incl. delay, platform)
+  plus any walking connections between platforms
 - No account/API key needed – the EFA endpoint is free and unauthenticated
 
 **Note:** since routes live entirely in card configuration (not in Home
@@ -131,7 +134,7 @@ setup (storage-mode dashboards). If your dashboard uses legacy YAML mode,
 add this manually to `ui-lovelace.yaml`:
 ```yaml
 resources:
-  - url: /ha_dynconnections/ha-dynconnections-card.js?v=6
+  - url: /ha_dynconnections/ha-dynconnections-card.js?v=7
     type: module
 ```
 

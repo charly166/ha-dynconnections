@@ -35,6 +35,18 @@ function formatTime(iso) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function delayHtml(minutes) {
+  return minutes ? ` <span class="delay">+${minutes}</span>` : "";
+}
+
+// Hebt das Gleis farblich hervor, wenn es vom ursprünglich geplanten
+// abweicht (Gleiswechsel), mit dem geplanten Gleis als Tooltip.
+function platformHtml(platform, plannedPlatform) {
+  if (!platform) return "-";
+  if (!plannedPlatform || plannedPlatform === platform) return escapeHtml(platform);
+  return `<span class="platform-changed" title="Ursprünglich geplant: ${escapeHtml(plannedPlatform)}">${escapeHtml(platform)}</span>`;
+}
+
 // Kleine farbige Verkehrsmittel-Badges, angelehnt an die auf vvs.de/
 // efa.vvs.de selbst verwendete Farbgebung (grüner Kreis "S" für S-Bahn,
 // blau für Stadtbahn/U-Bahn, rot für Bus) - eigene Nachbildung des Stils,
@@ -349,9 +361,9 @@ class HaDynConnectionsCard extends HTMLElement {
         <tr>
           <td>${lineBadgeHtml(c.line, c.product)} ${escapeHtml(c.line || "-")}</td>
           <td>${escapeHtml(c.direction || "-")}</td>
-          <td>${formatTime(c.departure)}${c.delay_minutes ? ` <span class="delay">+${c.delay_minutes}</span>` : ""}</td>
-          <td>${escapeHtml(c.platform || "-")}</td>
-          <td>${formatTime(c.arrival)}</td>
+          <td>${formatTime(c.departure)}${delayHtml(c.delay_minutes)}</td>
+          <td>${platformHtml(c.platform, c.planned_platform)}</td>
+          <td>${formatTime(c.arrival)}${delayHtml(c.arrival_delay_minutes)}</td>
           <td>${transfersCell}</td>
           <td>${c.duration_minutes != null ? `${c.duration_minutes} min` : "-"}</td>
         </tr>
@@ -380,8 +392,8 @@ class HaDynConnectionsCard extends HTMLElement {
       return `
         <div class="leg">
           <div class="leg-line">${lineBadgeHtml(leg.line, leg.product)} <strong>${escapeHtml(leg.line || "-")}</strong> Richtung ${escapeHtml(leg.direction || "-")}</div>
-          <div class="leg-stop">ab <strong>${escapeHtml(leg.departure_stop || "-")}</strong> ${formatTime(leg.departure)}${leg.delay_minutes ? ` <span class="delay">+${leg.delay_minutes}</span>` : ""}${leg.departure_platform ? ` (${escapeHtml(leg.departure_platform)})` : ""}</div>
-          <div class="leg-stop">an <strong>${escapeHtml(leg.arrival_stop || "-")}</strong> ${formatTime(leg.arrival)}${leg.arrival_platform ? ` (${escapeHtml(leg.arrival_platform)})` : ""}</div>
+          <div class="leg-stop">ab <strong>${escapeHtml(leg.departure_stop || "-")}</strong> ${formatTime(leg.departure)}${delayHtml(leg.delay_minutes)}${leg.departure_platform ? ` (${platformHtml(leg.departure_platform, leg.planned_departure_platform)})` : ""}</div>
+          <div class="leg-stop">an <strong>${escapeHtml(leg.arrival_stop || "-")}</strong> ${formatTime(leg.arrival)}${delayHtml(leg.arrival_delay_minutes)}${leg.arrival_platform ? ` (${platformHtml(leg.arrival_platform, leg.planned_arrival_platform)})` : ""}</div>
         </div>`;
     });
     return `<div class="itinerary">${steps.join("")}</div>`;
@@ -413,6 +425,7 @@ class HaDynConnectionsCard extends HTMLElement {
       th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--divider-color); font-size: 0.9em; }
       th { color: var(--secondary-text-color); font-weight: 500; }
       .delay { color: var(--error-color, #db4437); font-weight: 600; }
+      .platform-changed { color: var(--error-color, #db4437); font-weight: 600; text-decoration: underline dotted; cursor: help; }
       .empty { color: var(--secondary-text-color); font-style: italic; }
       .error { color: var(--error-color, #db4437); }
       .toggle-details { background: none; border: none; color: var(--primary-color); padding: 2px 4px; font: inherit; cursor: pointer; }
