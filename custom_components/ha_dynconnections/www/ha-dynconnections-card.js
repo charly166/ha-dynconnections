@@ -35,32 +35,13 @@ function formatTime(iso) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-// Ordnet einer Linie ein passendes mdi-Icon zu. Primär anhand des EFA
-// "product"-Felds (z.B. "S-Bahn", "Stadtbahn", "Bus", "Nachtbus") - das ist
-// zuverlässiger als der Linienname, dessen Format "<Produkt> <Code>" ist
-// (z.B. "S-Bahn S1", "R-Bahn RE14"). Regionalzüge (RE/RB/MEX) und
-// Fernverkehr (ICE/IC/EC) teilen sich bei EFA oft dasselbe generische
-// Produkt ("R-Bahn"/"Zug"), daher zusätzlich der Liniencode als Tie-Breaker.
-function lineIcon(line, product) {
-  const p = (product || "").toLowerCase();
-  const tokens = (line || "").toUpperCase().split(/\s+/);
-
-  if (p === "s-bahn") return "mdi:subway-variant";
-  if (p === "stadtbahn") return "mdi:subway";
-  if (p === "nachtbus") return "mdi:bus-clock";
-  if (p.includes("sev")) return "mdi:bus-alert";
-  if (p.includes("bus")) return "mdi:bus";
-  if (p === "fussweg") return "mdi:walk";
-  if (tokens.some((t) => /^(ICE|IC|EC)\d*$/.test(t))) return "mdi:train-variant";
-  if (p === "r-bahn" || p === "zug" || tokens.some((t) => /^(MEX|RE|RB|IRE)\d*$/.test(t))) return "mdi:train";
-  return "mdi:transit-connection-variant";
-}
-
-// Kleine farbige Verkehrsmittel-Badges für die Haltestellenauswahl, angelehnt
-// an die auf vvs.de/efa.vvs.de selbst verwendete Farbgebung (grüner Kreis
-// "S" für S-Bahn, blau für Stadtbahn/U-Bahn, rot für Bus) - eigene
-// Nachbildung des Stils, keine übernommenen Grafiken. `modes` kommt von
-// api.py (_stop_modes(), aus EFAs STOP_MOT_LIST/"modes"-Feld).
+// Kleine farbige Verkehrsmittel-Badges, angelehnt an die auf vvs.de/
+// efa.vvs.de selbst verwendete Farbgebung (grüner Kreis "S" für S-Bahn,
+// blau für Stadtbahn/U-Bahn, rot für Bus) - eigene Nachbildung des Stils,
+// keine übernommenen Grafiken. Werden sowohl für die Haltestellenauswahl
+// (Kategorien aus api.py's _stop_modes()/EFAs STOP_MOT_LIST) als auch für
+// die Linien in der Verbindungs-Tabelle verwendet (siehe lineModeCategory()),
+// damit beide dieselbe visuelle Sprache sprechen.
 const MODE_BADGES = {
   sbahn: { label: "S", bg: "#00a650" },
   ubahn: { label: "U", bg: "#0075bf" },
@@ -82,6 +63,31 @@ function modeBadgesHtml(modes) {
         : `<span class="mode-badge" style="background:${b.bg}"><ha-icon icon="${b.icon}"></ha-icon></span>`
     )
     .join("");
+}
+
+// Ordnet eine Linie derselben Badge-Kategorie wie die Haltestellenauswahl
+// zu. Primär anhand des EFA "product"-Felds (z.B. "S-Bahn", "Stadtbahn",
+// "Bus", "Nachtbus") - das ist zuverlässiger als der Linienname, dessen
+// Format "<Produkt> <Code>" ist (z.B. "S-Bahn S1", "R-Bahn RE14").
+// Regionalzüge (RE/RB/MEX) und Fernverkehr (ICE/IC/EC) teilen sich bei EFA
+// oft dasselbe generische Produkt ("R-Bahn"/"Zug") und werden - wie schon
+// bei den Haltestellen-Badges - in derselben grauen "R"-Kategorie
+// zusammengefasst, statt eine eigene Fernverkehr-Kategorie zu erfinden.
+function lineModeCategory(line, product) {
+  const p = (product || "").toLowerCase();
+  const tokens = (line || "").toUpperCase().split(/\s+/);
+
+  if (p === "s-bahn") return "sbahn";
+  if (p === "stadtbahn") return "stadtbahn";
+  if (p === "nachtbus" || p.includes("sev") || p.includes("bus")) return "bus";
+  if (p === "fussweg") return null;
+  if (tokens.some((t) => /^(ICE|IC|EC)\d*$/.test(t))) return "zug";
+  if (p === "r-bahn" || p === "zug" || tokens.some((t) => /^(MEX|RE|RB|IRE)\d*$/.test(t))) return "zug";
+  return null;
+}
+
+function lineBadgeHtml(line, product) {
+  return modeBadgesHtml([lineModeCategory(line, product)]);
 }
 
 class HaDynConnectionsCard extends HTMLElement {
@@ -341,7 +347,7 @@ class HaDynConnectionsCard extends HTMLElement {
 
         return `
         <tr>
-          <td><ha-icon icon="${lineIcon(c.line, c.product)}"></ha-icon> ${escapeHtml(c.line || "-")}</td>
+          <td>${lineBadgeHtml(c.line, c.product)} ${escapeHtml(c.line || "-")}</td>
           <td>${escapeHtml(c.direction || "-")}</td>
           <td>${formatTime(c.departure)}${c.delay_minutes ? ` <span class="delay">+${c.delay_minutes}</span>` : ""}</td>
           <td>${escapeHtml(c.platform || "-")}</td>
@@ -373,7 +379,7 @@ class HaDynConnectionsCard extends HTMLElement {
       }
       return `
         <div class="leg">
-          <div class="leg-line"><ha-icon icon="${lineIcon(leg.line, leg.product)}"></ha-icon> <strong>${escapeHtml(leg.line || "-")}</strong> Richtung ${escapeHtml(leg.direction || "-")}</div>
+          <div class="leg-line">${lineBadgeHtml(leg.line, leg.product)} <strong>${escapeHtml(leg.line || "-")}</strong> Richtung ${escapeHtml(leg.direction || "-")}</div>
           <div class="leg-stop">ab <strong>${escapeHtml(leg.departure_stop || "-")}</strong> ${formatTime(leg.departure)}${leg.delay_minutes ? ` <span class="delay">+${leg.delay_minutes}</span>` : ""}${leg.departure_platform ? ` (${escapeHtml(leg.departure_platform)})` : ""}</div>
           <div class="leg-stop">an <strong>${escapeHtml(leg.arrival_stop || "-")}</strong> ${formatTime(leg.arrival)}${leg.arrival_platform ? ` (${escapeHtml(leg.arrival_platform)})` : ""}</div>
         </div>`;
@@ -406,7 +412,6 @@ class HaDynConnectionsCard extends HTMLElement {
       table { width: 100%; border-collapse: collapse; }
       th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--divider-color); font-size: 0.9em; }
       th { color: var(--secondary-text-color); font-weight: 500; }
-      td ha-icon { --mdc-icon-size: 18px; vertical-align: text-bottom; color: var(--secondary-text-color); }
       .delay { color: var(--error-color, #db4437); font-weight: 600; }
       .empty { color: var(--secondary-text-color); font-style: italic; }
       .error { color: var(--error-color, #db4437); }
@@ -415,7 +420,6 @@ class HaDynConnectionsCard extends HTMLElement {
       .itinerary { display: flex; flex-direction: column; gap: 10px; padding: 8px 0 0 8px; border-left: 2px solid var(--divider-color); margin-left: 6px; }
       .leg { font-size: 0.9em; }
       .leg-line { margin-bottom: 2px; }
-      .leg-line ha-icon { --mdc-icon-size: 18px; vertical-align: text-bottom; color: var(--secondary-text-color); }
       .leg-stop { color: var(--secondary-text-color); padding-left: 2px; }
       .leg.walk { color: var(--secondary-text-color); font-style: italic; }
       .leg.walk ha-icon { --mdc-icon-size: 16px; vertical-align: text-bottom; }

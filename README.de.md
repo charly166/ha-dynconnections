@@ -46,9 +46,9 @@ selbst nutzt.
 - **Such-Button** – Verbindungen werden nur abgefragt, wenn du es willst,
   nicht per Timer
 - **Die nächsten 5 Verbindungen** werden direkt in der Karte als Timetable
-  angezeigt (Linie mit Verkehrsmittel-Icon – S-Bahn, Stadtbahn/U-Bahn, Bus,
-  Regional-/Expresszug etc. –, Richtung, Abfahrt inkl. Verspätung, Gleis,
-  Ankunft, Umstiege, Dauer)
+  angezeigt (Linie mit demselben farbigen Verkehrsmittel-Badge wie bei der
+  Haltestellenauswahl, Richtung, Abfahrt inkl. Verspätung, Gleis, Ankunft,
+  Umstiege, Dauer)
 - **Vollständige Reiseroute bei Bedarf**: Verbindungen mit Umstieg lassen
   sich aufklappen und zeigen dann jede Etappe (Linie, Richtung, Haltestelle,
   Zeit, Gleis) inklusive eventueller Fußwege zwischen Bahnsteigen
@@ -142,7 +142,7 @@ Ressource (Storage-Modus-Dashboards). Nutzt dein Dashboard den alten
 YAML-Modus, füge das manuell in `ui-lovelace.yaml` ein:
 ```yaml
 resources:
-  - url: /ha_dynconnections/ha-dynconnections-card.js?v=5
+  - url: /ha_dynconnections/ha-dynconnections-card.js?v=6
     type: module
 ```
 

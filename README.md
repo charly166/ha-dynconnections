@@ -44,9 +44,8 @@ its data source.
 - **Search button** – connections are only looked up when you actually want
   them, not on a timer
 - **Next 5 connections** rendered directly in the card as a timetable
-  (line with a mode icon – S-Bahn, Stadtbahn/U-Bahn, bus, regional/express
-  train, etc. –, direction, departure incl. delay, platform, arrival,
-  transfers, duration)
+  (line with the same colored mode badge as the stop picker, direction,
+  departure incl. delay, platform, arrival, transfers, duration)
 - **Full itinerary on demand**: connections with a transfer can be expanded
   to show every leg (line, direction, stop, time, platform) plus any
   walking connections between platforms
@@ -132,7 +131,7 @@ setup (storage-mode dashboards). If your dashboard uses legacy YAML mode,
 add this manually to `ui-lovelace.yaml`:
 ```yaml
 resources:
-  - url: /ha_dynconnections/ha-dynconnections-card.js?v=5
+  - url: /ha_dynconnections/ha-dynconnections-card.js?v=6
     type: module
 ```
 
