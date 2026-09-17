@@ -37,11 +37,16 @@ its data source.
   configured `device_tracker` (e.g. your phone via the Companion App),
   shown as a dropdown, with a manual refresh button
 - **Optional desired departure time** – leave empty to search from "now"
+  (shown as a hint next to the field)
 - **Search button** – connections are only looked up when you actually want
   them, not on a timer
 - **Next 5 connections** rendered directly in the card as a timetable
-  (line, direction, departure incl. delay, platform, arrival, transfers,
-  duration)
+  (line with a mode icon – S-Bahn, Stadtbahn/U-Bahn, bus, regional/express
+  train, etc. –, direction, departure incl. delay, platform, arrival,
+  transfers, duration)
+- **Full itinerary on demand**: connections with a transfer can be expanded
+  to show every leg (line, direction, stop, time, platform) plus any
+  walking connections between platforms
 - No account/API key needed – the EFA endpoint is free and unauthenticated
 
 **Note:** since routes live entirely in card configuration (not in Home
@@ -124,7 +129,7 @@ setup (storage-mode dashboards). If your dashboard uses legacy YAML mode,
 add this manually to `ui-lovelace.yaml`:
 ```yaml
 resources:
-  - url: /ha_dynconnections/ha-dynconnections-card.js?v=3
+  - url: /ha_dynconnections/ha-dynconnections-card.js?v=4
     type: module
 ```
 
@@ -133,8 +138,10 @@ resources:
 1. The **departure stop** dropdown is populated from your device's current
    location when the card first loads; use the ⟳ button next to it to
    refresh after moving
-2. Optionally set a **desired departure time**
+2. Optionally set a **desired departure time** (leave empty for "now")
 3. Press **search** – the card shows the next 5 connections
+4. For a connection with a transfer, click the transfer count to expand the
+   full itinerary (every leg with its stop, time, and platform)
 
 ## Technical Notes
 

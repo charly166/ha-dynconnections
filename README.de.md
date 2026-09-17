@@ -38,11 +38,16 @@ selbst nutzt.
   des konfigurierten `device_tracker` (z.B. dein Handy über die Companion
   App), als Dropdown mit manuellem Aktualisieren-Button
 - **Optionale Wunsch-Abfahrtszeit** – leer lassen für eine Suche ab "jetzt"
+  (als Hinweis direkt neben dem Feld angezeigt)
 - **Such-Button** – Verbindungen werden nur abgefragt, wenn du es willst,
   nicht per Timer
 - **Die nächsten 5 Verbindungen** werden direkt in der Karte als Timetable
-  angezeigt (Linie, Richtung, Abfahrt inkl. Verspätung, Gleis, Ankunft,
-  Umstiege, Dauer)
+  angezeigt (Linie mit Verkehrsmittel-Icon – S-Bahn, Stadtbahn/U-Bahn, Bus,
+  Regional-/Expresszug etc. –, Richtung, Abfahrt inkl. Verspätung, Gleis,
+  Ankunft, Umstiege, Dauer)
+- **Vollständige Reiseroute bei Bedarf**: Verbindungen mit Umstieg lassen
+  sich aufklappen und zeigen dann jede Etappe (Linie, Richtung, Haltestelle,
+  Zeit, Gleis) inklusive eventueller Fußwege zwischen Bahnsteigen
 - Kein Account/API-Key nötig – die EFA-Schnittstelle ist kostenlos und ohne
   Authentifizierung nutzbar
 
@@ -133,7 +138,7 @@ Ressource (Storage-Modus-Dashboards). Nutzt dein Dashboard den alten
 YAML-Modus, füge das manuell in `ui-lovelace.yaml` ein:
 ```yaml
 resources:
-  - url: /ha_dynconnections/ha-dynconnections-card.js?v=3
+  - url: /ha_dynconnections/ha-dynconnections-card.js?v=4
     type: module
 ```
 
@@ -142,8 +147,11 @@ resources:
 1. Das Dropdown für die **Abfahrtshaltestelle** wird beim ersten Laden der
    Karte aus dem aktuellen Standort deines Geräts befüllt; über den
    ⟳-Button daneben nach einer Standortänderung aktualisieren
-2. Optional eine **Wunsch-Abfahrtszeit** setzen
+2. Optional eine **Wunsch-Abfahrtszeit** setzen (leer lassen für "jetzt")
 3. **Suchen** drücken – die Karte zeigt die nächsten 5 Verbindungen
+4. Bei einer Verbindung mit Umstieg auf die Umstiegsanzahl klicken, um die
+   vollständige Reiseroute aufzuklappen (jede Etappe mit Haltestelle, Zeit
+   und Gleis)
 
 ## Technische Hinweise
 

@@ -35,6 +35,27 @@ function formatTime(iso) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+// Ordnet einer Linie ein passendes mdi-Icon zu. Primär anhand des EFA
+// "product"-Felds (z.B. "S-Bahn", "Stadtbahn", "Bus", "Nachtbus") - das ist
+// zuverlässiger als der Linienname, dessen Format "<Produkt> <Code>" ist
+// (z.B. "S-Bahn S1", "R-Bahn RE14"). Regionalzüge (RE/RB/MEX) und
+// Fernverkehr (ICE/IC/EC) teilen sich bei EFA oft dasselbe generische
+// Produkt ("R-Bahn"/"Zug"), daher zusätzlich der Liniencode als Tie-Breaker.
+function lineIcon(line, product) {
+  const p = (product || "").toLowerCase();
+  const tokens = (line || "").toUpperCase().split(/\s+/);
+
+  if (p === "s-bahn") return "mdi:subway-variant";
+  if (p === "stadtbahn") return "mdi:subway";
+  if (p === "nachtbus") return "mdi:bus-clock";
+  if (p.includes("sev")) return "mdi:bus-alert";
+  if (p.includes("bus")) return "mdi:bus";
+  if (p === "fussweg") return "mdi:walk";
+  if (tokens.some((t) => /^(ICE|IC|EC)\d*$/.test(t))) return "mdi:train-variant";
+  if (p === "r-bahn" || p === "zug" || tokens.some((t) => /^(MEX|RE|RB|IRE)\d*$/.test(t))) return "mdi:train";
+  return "mdi:transit-connection-variant";
+}
+
 class HaDynConnectionsCard extends HTMLElement {
   setConfig(config) {
     const next = config || {};
@@ -49,6 +70,7 @@ class HaDynConnectionsCard extends HTMLElement {
     this._selectedOriginId = this._selectedOriginId || null;
     this._connections = this._connections || [];
     this._departureValue = this._departureValue || "";
+    this._expandedRows = this._expandedRows || new Set();
     this._render();
   }
 
@@ -131,6 +153,7 @@ class HaDynConnectionsCard extends HTMLElement {
         ...(departure ? { departure } : {}),
       });
       this._connections = result.connections || [];
+      this._expandedRows = new Set();
     } catch (err) {
       this._searchError = err.message || "Verbindungssuche fehlgeschlagen.";
     } finally {
@@ -180,7 +203,7 @@ class HaDynConnectionsCard extends HTMLElement {
               </span>
             </label>
             <label>
-              Abfahrt
+              Abfahrt <span class="hint">(leer = jetzt)</span>
               <input id="departure" type="datetime-local" value="${escapeHtml(this._departureValue)}" />
             </label>
             <button id="search" ${this._searching || !this._selectedOriginId ? "disabled" : ""}>
@@ -201,6 +224,18 @@ class HaDynConnectionsCard extends HTMLElement {
       this._departureValue = ev.target.value;
     });
     this.shadowRoot.getElementById("search").addEventListener("click", () => this._search());
+
+    this.shadowRoot.querySelectorAll(".toggle-details").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.dataset.idx);
+        if (this._expandedRows.has(idx)) {
+          this._expandedRows.delete(idx);
+        } else {
+          this._expandedRows.add(idx);
+        }
+        this._render();
+      });
+    });
   }
 
   _renderTable() {
@@ -208,18 +243,26 @@ class HaDynConnectionsCard extends HTMLElement {
       return `<p class="empty">Noch keine Suche gestartet oder keine Verbindungen gefunden.</p>`;
     }
     const rows = this._connections
-      .map(
-        (c) => `
+      .map((c, idx) => {
+        const legCount = (c.legs || []).filter((l) => !l.walking).length;
+        const expanded = this._expandedRows.has(idx);
+        const transfersCell =
+          legCount > 1
+            ? `<button class="toggle-details" data-idx="${idx}">${c.transfers ?? legCount - 1} ${expanded ? "▲" : "▼"}</button>`
+            : `${c.transfers ?? 0}`;
+
+        return `
         <tr>
-          <td>${escapeHtml(c.line || "-")}</td>
+          <td><ha-icon icon="${lineIcon(c.line, c.product)}"></ha-icon> ${escapeHtml(c.line || "-")}</td>
           <td>${escapeHtml(c.direction || "-")}</td>
           <td>${formatTime(c.departure)}${c.delay_minutes ? ` <span class="delay">+${c.delay_minutes}</span>` : ""}</td>
           <td>${escapeHtml(c.platform || "-")}</td>
           <td>${formatTime(c.arrival)}</td>
-          <td>${c.transfers ?? "-"}</td>
+          <td>${transfersCell}</td>
           <td>${c.duration_minutes != null ? `${c.duration_minutes} min` : "-"}</td>
-        </tr>`
-      )
+        </tr>
+        ${expanded ? `<tr class="details-row"><td colspan="7">${this._renderItinerary(c.legs || [])}</td></tr>` : ""}`;
+      })
       .join("");
 
     return `
@@ -234,12 +277,29 @@ class HaDynConnectionsCard extends HTMLElement {
     `;
   }
 
+  _renderItinerary(legs) {
+    const steps = legs.map((leg) => {
+      if (leg.walking) {
+        const duration = leg.duration_minutes != null ? ` (${leg.duration_minutes} min)` : "";
+        return `<div class="leg walk"><ha-icon icon="mdi:walk"></ha-icon> Fußweg${duration}</div>`;
+      }
+      return `
+        <div class="leg">
+          <div class="leg-line"><ha-icon icon="${lineIcon(leg.line, leg.product)}"></ha-icon> <strong>${escapeHtml(leg.line || "-")}</strong> Richtung ${escapeHtml(leg.direction || "-")}</div>
+          <div class="leg-stop">ab <strong>${escapeHtml(leg.departure_stop || "-")}</strong> ${formatTime(leg.departure)}${leg.delay_minutes ? ` <span class="delay">+${leg.delay_minutes}</span>` : ""}${leg.departure_platform ? ` (${escapeHtml(leg.departure_platform)})` : ""}</div>
+          <div class="leg-stop">an <strong>${escapeHtml(leg.arrival_stop || "-")}</strong> ${formatTime(leg.arrival)}${leg.arrival_platform ? ` (${escapeHtml(leg.arrival_platform)})` : ""}</div>
+        </div>`;
+    });
+    return `<div class="itinerary">${steps.join("")}</div>`;
+  }
+
   static _styles() {
     return `
       .header { font-size: 1.2em; font-weight: 500; padding: 16px 16px 0; color: var(--primary-text-color); }
       .card-content { padding: 16px; font-family: var(--paper-font-body1_-_font-family, inherit); }
       .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 16px; }
       label { display: flex; flex-direction: column; font-size: 0.85em; color: var(--secondary-text-color); gap: 4px; }
+      .hint { font-weight: normal; font-style: italic; opacity: 0.8; }
       .row { display: flex; gap: 4px; }
       select, input, button { font: inherit; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); }
       button { cursor: pointer; background: var(--primary-color); color: var(--text-primary-color, #fff); border: none; padding: 8px 14px; }
@@ -248,9 +308,19 @@ class HaDynConnectionsCard extends HTMLElement {
       table { width: 100%; border-collapse: collapse; }
       th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--divider-color); font-size: 0.9em; }
       th { color: var(--secondary-text-color); font-weight: 500; }
+      td ha-icon { --mdc-icon-size: 18px; vertical-align: text-bottom; color: var(--secondary-text-color); }
       .delay { color: var(--error-color, #db4437); font-weight: 600; }
       .empty { color: var(--secondary-text-color); font-style: italic; }
       .error { color: var(--error-color, #db4437); }
+      .toggle-details { background: none; border: none; color: var(--primary-color); padding: 2px 4px; font: inherit; cursor: pointer; }
+      .details-row td { padding: 0 8px 12px; border-bottom: 1px solid var(--divider-color); }
+      .itinerary { display: flex; flex-direction: column; gap: 10px; padding: 8px 0 0 8px; border-left: 2px solid var(--divider-color); margin-left: 6px; }
+      .leg { font-size: 0.9em; }
+      .leg-line { margin-bottom: 2px; }
+      .leg-line ha-icon { --mdc-icon-size: 18px; vertical-align: text-bottom; color: var(--secondary-text-color); }
+      .leg-stop { color: var(--secondary-text-color); padding-left: 2px; }
+      .leg.walk { color: var(--secondary-text-color); font-style: italic; }
+      .leg.walk ha-icon { --mdc-icon-size: 16px; vertical-align: text-bottom; }
     `;
   }
 }

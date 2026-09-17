@@ -162,27 +162,68 @@ def _point_datetime(point: dict[str, Any], *, realtime: bool) -> str | None:
         return None
 
 
-def summarize_journey(trip: dict[str, Any]) -> dict[str, Any]:
-    """Fasst ein EFA-Trip-Objekt zu einer flachen Timetable-Zeile zusammen."""
-    legs = _as_list(trip.get("legs"))
-    transit_legs = [leg for leg in legs if leg.get("mode")]
-    first_leg = transit_legs[0] if transit_legs else (legs[0] if legs else {})
-    last_leg = transit_legs[-1] if transit_legs else (legs[-1] if legs else {})
+def _delay_minutes(planned: str | None, real: str | None) -> int:
+    if not planned or not real or planned == real:
+        return 0
+    try:
+        return round((datetime.fromisoformat(real) - datetime.fromisoformat(planned)).total_seconds() / 60)
+    except ValueError:
+        return 0
 
-    first_points = _as_list(first_leg.get("points"))
-    last_points = _as_list(last_leg.get("points"))
-    departure_point = next((p for p in first_points if p.get("usage") == "departure"), {})
-    arrival_point = next((p for p in last_points if p.get("usage") == "arrival"), {})
+
+def _is_walking_leg(mode: dict[str, Any]) -> bool:
+    # Fußweg-Etappen (z.B. Umstieg zwischen zwei Bahnsteigen) haben zwar ein
+    # "mode"-Objekt, aber weder Liniennamen noch -nummer.
+    return mode.get("product") == "Fussweg" or not (mode.get("name") or mode.get("number"))
+
+
+def _leg_summary(leg: dict[str, Any]) -> dict[str, Any]:
+    """Fasst eine einzelne Etappe (Leg) für die Detail-Ansicht der Route zusammen."""
+    mode = leg.get("mode") or {}
+    points = _as_list(leg.get("points"))
+    departure_point = next((p for p in points if p.get("usage") == "departure"), {})
+    arrival_point = next((p for p in points if p.get("usage") == "arrival"), {})
+
+    if _is_walking_leg(mode):
+        try:
+            duration_minutes = int(leg["timeMinute"]) if leg.get("timeMinute") else None
+        except (TypeError, ValueError):
+            duration_minutes = None
+        return {
+            "walking": True,
+            "duration_minutes": duration_minutes,
+            "departure_stop": _fix_mojibake(departure_point.get("name")),
+            "arrival_stop": _fix_mojibake(arrival_point.get("name")),
+        }
 
     planned_departure = _point_datetime(departure_point, realtime=False)
     real_departure = _point_datetime(departure_point, realtime=True) or planned_departure
+    planned_arrival = _point_datetime(arrival_point, realtime=False)
+    real_arrival = _point_datetime(arrival_point, realtime=True) or planned_arrival
 
-    delay_minutes = 0
-    if planned_departure and real_departure and planned_departure != real_departure:
-        delay_minutes = round(
-            (datetime.fromisoformat(real_departure) - datetime.fromisoformat(planned_departure)).total_seconds()
-            / 60
-        )
+    return {
+        "walking": False,
+        "line": mode.get("name") or mode.get("number"),
+        "product": mode.get("product"),
+        "direction": _fix_mojibake(mode.get("destination")),
+        "departure_stop": _fix_mojibake(departure_point.get("name")),
+        "departure": real_departure,
+        "planned_departure": planned_departure,
+        "departure_platform": departure_point.get("platform"),
+        "delay_minutes": _delay_minutes(planned_departure, real_departure),
+        "arrival_stop": _fix_mojibake(arrival_point.get("name")),
+        "arrival": real_arrival,
+        "planned_arrival": planned_arrival,
+        "arrival_platform": arrival_point.get("platform"),
+    }
+
+
+def summarize_journey(trip: dict[str, Any]) -> dict[str, Any]:
+    """Fasst ein EFA-Trip-Objekt zu einer Timetable-Zeile samt Etappen-Details zusammen."""
+    legs = [_leg_summary(leg) for leg in _as_list(trip.get("legs"))]
+    transit_legs = [leg for leg in legs if not leg["walking"]]
+    first_leg = transit_legs[0] if transit_legs else (legs[0] if legs else {})
+    last_leg = transit_legs[-1] if transit_legs else (legs[-1] if legs else {})
 
     duration_minutes = None
     duration = trip.get("duration")
@@ -190,18 +231,18 @@ def summarize_journey(trip: dict[str, Any]) -> dict[str, Any]:
         hours, minutes = duration.split(":")[:2]
         duration_minutes = int(hours) * 60 + int(minutes)
 
-    mode = first_leg.get("mode") or {}
-
     return {
-        "line": mode.get("name") or mode.get("number"),
-        "direction": _fix_mojibake(mode.get("destination")),
-        "departure": real_departure,
-        "planned_departure": planned_departure,
-        "delay_minutes": delay_minutes,
-        "platform": departure_point.get("platform"),
-        "arrival": _point_datetime(arrival_point, realtime=True) or _point_datetime(arrival_point, realtime=False),
-        "planned_arrival": _point_datetime(arrival_point, realtime=False),
+        "line": first_leg.get("line"),
+        "product": first_leg.get("product"),
+        "direction": first_leg.get("direction"),
+        "departure": first_leg.get("departure"),
+        "planned_departure": first_leg.get("planned_departure"),
+        "delay_minutes": first_leg.get("delay_minutes", 0),
+        "platform": first_leg.get("departure_platform"),
+        "arrival": last_leg.get("arrival"),
+        "planned_arrival": last_leg.get("planned_arrival"),
         "duration_minutes": duration_minutes,
         "transfers": int(trip.get("interchange", 0) or 0),
-        "lines": [leg["mode"]["name"] for leg in transit_legs if leg.get("mode", {}).get("name")],
+        "lines": [leg["line"] for leg in transit_legs if leg.get("line")],
+        "legs": legs,
     }
