@@ -28,7 +28,7 @@ from typing import Any
 import async_timeout
 from aiohttp import ClientSession
 
-from .const import EFA_BASE_URL
+from .const import DEFAULT_NEARBY_DISTANCE, EFA_BASE_URL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -159,7 +159,7 @@ class VvsEfaClient:
                 "max": results,
                 "inclFilter": 1,
                 "type_1": "STOP",
-                "radius_1": distance or 1000,
+                "radius_1": distance or DEFAULT_NEARBY_DISTANCE,
             },
         )
         pins = _as_list(data.get("pins"))
