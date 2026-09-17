@@ -35,7 +35,10 @@ its data source.
   destination combination (e.g. "home" and "work"); no extra setup steps
 - **Departure stop suggestions** based on the live GPS location of the
   configured `device_tracker` (e.g. your phone via the Companion App),
-  shown as a dropdown, with a manual refresh button
+  shown as a dropdown with a manual refresh button; each stop shows small
+  badges for the modes serving it (S-Bahn, U-Bahn/Stadtbahn, bus, regional
+  train), like on vvs.de's own stop search – same badges appear next to
+  destination search results in the card editor
 - **Optional desired departure time** – leave empty to search from "now"
   (shown as a hint next to the field)
 - **Search button** – connections are only looked up when you actually want
@@ -129,7 +132,7 @@ setup (storage-mode dashboards). If your dashboard uses legacy YAML mode,
 add this manually to `ui-lovelace.yaml`:
 ```yaml
 resources:
-  - url: /ha_dynconnections/ha-dynconnections-card.js?v=4
+  - url: /ha_dynconnections/ha-dynconnections-card.js?v=5
     type: module
 ```
 

@@ -36,7 +36,11 @@ selbst nutzt.
   keine zusätzlichen Einrichtungsschritte nötig
 - **Vorschläge für die Abfahrtshaltestelle** basierend auf dem Live-Standort
   des konfigurierten `device_tracker` (z.B. dein Handy über die Companion
-  App), als Dropdown mit manuellem Aktualisieren-Button
+  App), als Dropdown mit manuellem Aktualisieren-Button; jede Haltestelle
+  zeigt kleine Badges für die dort verkehrenden Verkehrsmittel (S-Bahn,
+  U-Bahn/Stadtbahn, Bus, Regionalzug) – wie bei der Haltestellensuche auf
+  vvs.de selbst; dieselben Badges erscheinen auch bei den Zielsuche-
+  Ergebnissen im Karten-Editor
 - **Optionale Wunsch-Abfahrtszeit** – leer lassen für eine Suche ab "jetzt"
   (als Hinweis direkt neben dem Feld angezeigt)
 - **Such-Button** – Verbindungen werden nur abgefragt, wenn du es willst,
@@ -138,7 +142,7 @@ Ressource (Storage-Modus-Dashboards). Nutzt dein Dashboard den alten
 YAML-Modus, füge das manuell in `ui-lovelace.yaml` ein:
 ```yaml
 resources:
-  - url: /ha_dynconnections/ha-dynconnections-card.js?v=4
+  - url: /ha_dynconnections/ha-dynconnections-card.js?v=5
     type: module
 ```
 

@@ -56,7 +56,51 @@ function lineIcon(line, product) {
   return "mdi:transit-connection-variant";
 }
 
+// Kleine farbige Verkehrsmittel-Badges für die Haltestellenauswahl, angelehnt
+// an die auf vvs.de/efa.vvs.de selbst verwendete Farbgebung (grüner Kreis
+// "S" für S-Bahn, blau für Stadtbahn/U-Bahn, rot für Bus) - eigene
+// Nachbildung des Stils, keine übernommenen Grafiken. `modes` kommt von
+// api.py (_stop_modes(), aus EFAs STOP_MOT_LIST/"modes"-Feld).
+const MODE_BADGES = {
+  sbahn: { label: "S", bg: "#00a650" },
+  ubahn: { label: "U", bg: "#0075bf" },
+  stadtbahn: { label: "U", bg: "#0075bf" },
+  tram: { label: "T", bg: "#0075bf" },
+  bus: { label: "BUS", bg: "#e30613" },
+  zug: { label: "R", bg: "#6e6e6e" },
+  seilbahn: { icon: "mdi:gondola", bg: "#6e6e6e" },
+  schiff: { icon: "mdi:ferry", bg: "#0075bf" },
+};
+
+function modeBadgesHtml(modes) {
+  return (modes || [])
+    .map((m) => MODE_BADGES[m])
+    .filter(Boolean)
+    .map((b) =>
+      b.label
+        ? `<span class="mode-badge" style="background:${b.bg}">${b.label}</span>`
+        : `<span class="mode-badge" style="background:${b.bg}"><ha-icon icon="${b.icon}"></ha-icon></span>`
+    )
+    .join("");
+}
+
 class HaDynConnectionsCard extends HTMLElement {
+  constructor() {
+    super();
+    this._handleOutsideClick = this._handleOutsideClick.bind(this);
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener("click", this._handleOutsideClick);
+  }
+
+  _handleOutsideClick() {
+    if (this._originListOpen) {
+      this._originListOpen = false;
+      this._render();
+    }
+  }
+
   setConfig(config) {
     const next = config || {};
     if (this._config && JSON.stringify(this._config) === JSON.stringify(next)) {
@@ -71,6 +115,7 @@ class HaDynConnectionsCard extends HTMLElement {
     this._connections = this._connections || [];
     this._departureValue = this._departureValue || "";
     this._expandedRows = this._expandedRows || new Set();
+    this._originListOpen = this._originListOpen || false;
     this._render();
   }
 
@@ -180,6 +225,12 @@ class HaDynConnectionsCard extends HTMLElement {
     }
 
     const title = this._config.title || `Nach ${this._config.destination_name || "?"}`;
+    const selectedStop = this._originStops.find((s) => s.id === this._selectedOriginId);
+    const toggleLabel = this._loadingStops
+      ? "Lädt…"
+      : selectedStop
+        ? escapeHtml(selectedStop.name)
+        : "– keine Haltestelle –";
 
     this.shadowRoot.innerHTML = `
       <style>${HaDynConnectionsCard._styles()}</style>
@@ -188,20 +239,38 @@ class HaDynConnectionsCard extends HTMLElement {
         <div class="card-content">
           ${this._stopsError ? `<p class="error">${escapeHtml(this._stopsError)}</p>` : ""}
           <div class="controls">
-            <label>
+            <!-- Bewusst <div>, nicht <label>: ein <label>, das einen Button
+                 umschließt, leitet jeden Klick irgendwo im Label (auch auf
+                 die Listeneinträge weiter unten) zusätzlich als synthetischen
+                 Klick an diesen Button weiter - das öffnete die Liste sofort
+                 wieder, direkt nachdem ein Eintrag sie geschlossen hatte. -->
+            <div class="field">
               Von
               <span class="row">
-                <select id="origin" ${this._loadingStops ? "disabled" : ""}>
-                  ${this._originStops
-                    .map(
-                      (stop) =>
-                        `<option value="${escapeHtml(stop.id)}" ${stop.id === this._selectedOriginId ? "selected" : ""}>${escapeHtml(stop.name)}</option>`
-                    )
-                    .join("")}
-                </select>
+                <div class="combobox">
+                  <button type="button" id="origin-toggle" class="combobox-toggle" ${this._loadingStops ? "disabled" : ""}>
+                    <span class="stop-name">${toggleLabel}</span>
+                    ${selectedStop ? modeBadgesHtml(selectedStop.modes) : ""}
+                    <span class="caret">▾</span>
+                  </button>
+                  ${
+                    this._originListOpen
+                      ? `<ul class="combobox-list">
+                          ${this._originStops
+                            .map(
+                              (stop) => `
+                            <li data-id="${escapeHtml(stop.id)}" class="${stop.id === this._selectedOriginId ? "selected" : ""}">
+                              <span class="stop-name">${escapeHtml(stop.name)}</span> ${modeBadgesHtml(stop.modes)}
+                            </li>`
+                            )
+                            .join("")}
+                        </ul>`
+                      : ""
+                  }
+                </div>
                 <button id="refresh" title="Haltestellen neu laden" ${this._loadingStops ? "disabled" : ""}>⟳</button>
               </span>
-            </label>
+            </div>
             <label>
               Abfahrt <span class="hint">(leer = jetzt)</span>
               <input id="departure" type="datetime-local" value="${escapeHtml(this._departureValue)}" />
@@ -216,9 +285,28 @@ class HaDynConnectionsCard extends HTMLElement {
       </ha-card>
     `;
 
-    this.shadowRoot.getElementById("origin").addEventListener("change", (ev) => {
-      this._selectedOriginId = ev.target.value;
+    window.removeEventListener("click", this._handleOutsideClick);
+
+    const originToggle = this.shadowRoot.getElementById("origin-toggle");
+    if (originToggle) {
+      originToggle.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this._originListOpen = !this._originListOpen;
+        this._render();
+      });
+    }
+    this.shadowRoot.querySelectorAll(".combobox-list li").forEach((li) => {
+      li.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this._selectedOriginId = li.dataset.id;
+        this._originListOpen = false;
+        this._render();
+      });
     });
+    if (this._originListOpen) {
+      window.addEventListener("click", this._handleOutsideClick);
+    }
+
     this.shadowRoot.getElementById("refresh").addEventListener("click", () => this._refreshNearbyStops());
     this.shadowRoot.getElementById("departure").addEventListener("change", (ev) => {
       this._departureValue = ev.target.value;
@@ -298,13 +386,23 @@ class HaDynConnectionsCard extends HTMLElement {
       .header { font-size: 1.2em; font-weight: 500; padding: 16px 16px 0; color: var(--primary-text-color); }
       .card-content { padding: 16px; font-family: var(--paper-font-body1_-_font-family, inherit); }
       .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 16px; }
-      label { display: flex; flex-direction: column; font-size: 0.85em; color: var(--secondary-text-color); gap: 4px; }
+      label, .field { display: flex; flex-direction: column; font-size: 0.85em; color: var(--secondary-text-color); gap: 4px; }
       .hint { font-weight: normal; font-style: italic; opacity: 0.8; }
-      .row { display: flex; gap: 4px; }
+      .row { display: flex; gap: 4px; align-items: start; }
       select, input, button { font: inherit; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); }
       button { cursor: pointer; background: var(--primary-color); color: var(--text-primary-color, #fff); border: none; padding: 8px 14px; }
       button:disabled { opacity: 0.6; cursor: default; }
       #refresh { padding: 6px 10px; }
+      .combobox { position: relative; }
+      .combobox-toggle { display: flex; align-items: center; gap: 6px; background: var(--card-background-color); color: var(--primary-text-color); border: 1px solid var(--divider-color); min-width: 160px; text-align: left; }
+      .combobox-toggle .stop-name { flex: 1; }
+      .combobox-toggle .caret { opacity: 0.6; }
+      .combobox-list { position: absolute; z-index: 5; top: calc(100% + 2px); left: 0; min-width: 220px; margin: 0; padding: 4px 0; list-style: none; background: var(--card-background-color); border: 1px solid var(--divider-color); border-radius: 6px; box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0,0,0,0.2)); max-height: 240px; overflow-y: auto; }
+      .combobox-list li { display: flex; align-items: center; gap: 6px; padding: 8px 10px; cursor: pointer; }
+      .combobox-list li .stop-name { flex: 1; }
+      .combobox-list li:hover, .combobox-list li.selected { background: var(--secondary-background-color, rgba(0,0,0,0.06)); }
+      .mode-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 4px; color: #fff; font-size: 0.7em; font-weight: 700; line-height: 1; }
+      .mode-badge ha-icon { --mdc-icon-size: 13px; }
       table { width: 100%; border-collapse: collapse; }
       th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--divider-color); font-size: 0.9em; }
       th { color: var(--secondary-text-color); font-weight: 500; }
@@ -434,7 +532,7 @@ class HaDynConnectionsCardEditor extends HTMLElement {
                 ${this._destinationResults
                   .map(
                     (stop) =>
-                      `<li data-id="${escapeHtml(stop.id)}" data-name="${escapeHtml(stop.name)}">${escapeHtml(stop.name)}</li>`
+                      `<li data-id="${escapeHtml(stop.id)}" data-name="${escapeHtml(stop.name)}"><span class="stop-name">${escapeHtml(stop.name)}</span> ${modeBadgesHtml(stop.modes)}</li>`
                   )
                   .join("")}
                 ${this._destinationResults.length === 0 ? "<li><em>Keine Treffer</em></li>" : ""}
@@ -479,8 +577,11 @@ class HaDynConnectionsCardEditor extends HTMLElement {
       .current { margin: 0; font-size: 0.9em; }
       .error { color: var(--error-color, #db4437); margin: 0; }
       .results { list-style: none; margin: 0; padding: 0; border: 1px solid var(--divider-color, #ccc); border-radius: 6px; max-height: 200px; overflow-y: auto; }
-      .results li { padding: 8px; cursor: pointer; }
+      .results li { display: flex; align-items: center; gap: 6px; padding: 8px; cursor: pointer; }
+      .results li .stop-name { flex: 1; }
       .results li:hover { background: var(--secondary-background-color, #f0f0f0); }
+      .mode-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 4px; color: #fff; font-size: 0.7em; font-weight: 700; line-height: 1; }
+      .mode-badge ha-icon { --mdc-icon-size: 13px; }
     `;
   }
 }

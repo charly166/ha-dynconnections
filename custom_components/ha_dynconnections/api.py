@@ -62,6 +62,43 @@ def _as_list(node: Any, singular_key: str | None = None) -> list[dict[str, Any]]
     return []
 
 
+# EFAs feste "MOT" (means of transport)-Typennummerierung, wie sie z.B. auch
+# als Filter-Parameter (excludedMeans) in der Trip-Anfrage auftaucht. Wird
+# genutzt, um pro Haltestelle anzuzeigen, welche Verkehrsmittel dort
+# abfahren (wie auf vvs.de/efa.vvs.de selbst, wo die Haltestellenauswahl
+# entsprechende kleine Icons neben jedem Treffer zeigt).
+_MOT_CATEGORY: dict[int, str] = {
+    0: "zug", 1: "sbahn", 2: "ubahn", 3: "stadtbahn", 4: "tram",
+    5: "bus", 6: "bus", 7: "bus", 8: "seilbahn", 9: "schiff",
+    10: "bus", 13: "zug", 14: "zug", 15: "zug", 16: "zug",
+    17: "bus", 18: "zug", 19: "bus", 20: "bus", 21: "bus",
+}
+
+
+def _stop_modes(codes: str | None) -> list[str]:
+    """Wandelt eine kommagetrennte MOT-Codeliste (z.B. "3,5,11") in eine
+    deduplizierte Liste bekannter Kategorien um ("sonstige"/unbekannte
+    Codes werden verworfen, da dafür kein sinnvolles Icon existiert)."""
+    if not codes:
+        return []
+    result: list[str] = []
+    for part in codes.split(","):
+        part = part.strip()
+        if not part.isdigit():
+            continue
+        category = _MOT_CATEGORY.get(int(part))
+        if category and category not in result:
+            result.append(category)
+    return result
+
+
+def _stop_attr(stop: dict[str, Any], name: str) -> str | None:
+    for attr in stop.get("attrs") or []:
+        if attr.get("name") == name:
+            return attr.get("value")
+    return None
+
+
 class VvsEfaClient:
     """Kapselt die wenigen EFA-Endpunkte, die diese Integration braucht.
 
@@ -101,7 +138,11 @@ class VvsEfaClient:
         points = _as_list(data.get("stopFinder", {}).get("points"), singular_key="point")
         stops = [p for p in points if p.get("anyType") == "stop"][:results]
         return [
-            {"id": stop["ref"]["id"], "name": _fix_mojibake(stop.get("object") or stop.get("name"))}
+            {
+                "id": stop["ref"]["id"],
+                "name": _fix_mojibake(stop.get("object") or stop.get("name")),
+                "modes": _stop_modes(stop.get("modes")),
+            }
             for stop in stops
             if stop.get("ref", {}).get("id")
         ]
@@ -123,7 +164,14 @@ class VvsEfaClient:
         )
         pins = _as_list(data.get("pins"))
         stops = [p for p in pins if p.get("type") == "STOP"]
-        return [{"id": stop["id"], "name": _fix_mojibake(stop.get("desc"))} for stop in stops]
+        return [
+            {
+                "id": stop["id"],
+                "name": _fix_mojibake(stop.get("desc")),
+                "modes": _stop_modes(_stop_attr(stop, "STOP_MOT_LIST")),
+            }
+            for stop in stops
+        ]
 
     async def journeys(
         self,
