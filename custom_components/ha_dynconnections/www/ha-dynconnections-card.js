@@ -208,7 +208,14 @@ class HaDynConnectionsCard extends HTMLElement {
     this._searchError = null;
     this._render();
     try {
-      const departure = this._departureValue ? new Date(this._departureValue).toISOString() : undefined;
+      // Bewusst NICHT über new Date(...).toISOString() in UTC umrechnen:
+      // das datetime-local-Feld liefert bereits die vom Nutzer eingegebene
+      // lokale Uhrzeit als reinen "YYYY-MM-DDTHH:MM"-String (ohne
+      // Zeitzone) - genau das erwartet auch die EFA-Schnittstelle für
+      // itdDate/itdTime (lokale VVS-/deutsche Zeit). Eine Umrechnung nach
+      // UTC und zurück als "naive" Zeit hätte hier die Zeitzone doppelt
+      // angewendet (führte bei Sommerzeit zu +2h Versatz).
+      const departure = this._departureValue || undefined;
       const result = await this._hass.connection.sendMessagePromise({
         type: `${DOMAIN}/search_journeys`,
         origin_id: this._selectedOriginId,

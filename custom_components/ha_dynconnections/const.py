@@ -21,4 +21,4 @@ CARD_FILENAME = "ha-dynconnections-card.js"
 STATIC_BASE_PATH = f"/{DOMAIN}"
 
 # Wird bei jeder inhaltlichen Änderung der Karte hochgezählt, siehe frontend.py.
-CARD_VERSION = "7"
+CARD_VERSION = "8"

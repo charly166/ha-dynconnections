@@ -134,7 +134,7 @@ setup (storage-mode dashboards). If your dashboard uses legacy YAML mode,
 add this manually to `ui-lovelace.yaml`:
 ```yaml
 resources:
-  - url: /ha_dynconnections/ha-dynconnections-card.js?v=7
+  - url: /ha_dynconnections/ha-dynconnections-card.js?v=8
     type: module
 ```
 
